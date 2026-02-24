@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ffb400">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>GOES-STAR // COMMAND</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
+function toggleMobSidebar(){
+  var s=document.getElementById('sidebar');
+  var o=document.getElementById('mob-overlay');
+  s.classList.toggle('mob-open');
+  o.classList.toggle('mob-open');
+}
+document.querySelectorAll('.tab-btn').forEach(function(b){
+  b.addEventListener('click',function(){
+    var s=document.getElementById('sidebar');
+    if(window.innerWidth<=768&&s.classList.contains('mob-open'))toggleMobSidebar();
+  });
+});
+document.getElementById('viewport').addEventListener('touchstart',function(){
+  var s=document.getElementById('sidebar');
+  if(window.innerWidth<=768&&s.classList.contains('mob-open'))toggleMobSidebar();
+},{passive:true});
+if('ontouchstart' in window||navigator.maxTouchPoints>0){
+  var _ctrlHints=document.querySelectorAll('.stat');
+  _ctrlHints.forEach(function(el){
+    if(el.innerHTML.indexOf('DRAG → ROTATE')>=0){
+      el.innerHTML=el.innerHTML.replace('SCROLL → ZOOM','PINCH → ZOOM').replace('HOVER → SAT INFO','TAP → SAT INFO');
+    }
+  });
+}
+
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+:root{--y:#ffb400;--bg:#0a0a0a;--ydim:rgba(255,180,0,.5);--ydim2:rgba(255,180,0,.2);--ydim3:rgba(255,180,0,.1)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--y);font-family:'JetBrains Mono',monospace;text-transform:uppercase;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+#header{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:2px solid var(--y);gap:10px;flex-wrap:wrap}
+#header h1{font-size:15px;font-weight:700;letter-spacing:-.02em;white-space:nowrap}
+.tabs{display:flex;gap:6px}
+.tab-btn{padding:4px 10px;border:1px solid var(--y);font-size:11px;cursor:pointer;font-family:inherit;text-transform:uppercase;background:transparent;color:var(--y);transition:all .15s}
+.tab-btn.active{background:var(--y);color:#000}
+.tab-btn:hover:not(.active){background:var(--ydim3)}
+#clock{font-size:16px;font-weight:700;white-space:nowrap}
+#clock small{font-size:9px;opacity:.4;display:block;text-align:right;margin-bottom:2px}
+#statusbar{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;padding:3px 14px;font-size:10px;border-bottom:1px solid var(--ydim2);background:rgba(255,180,0,.03)}
+#statusbar-left{display:flex;align-items:center;gap:8px}
+#dot{width:7px;height:7px;border-radius:50%;background:#444;flex-shrink:0;transition:background .3s}
+#body{flex:1;min-height:0;display:grid;grid-template-columns:270px 1fr;gap:0}
+#sidebar{border-right:1px solid rgba(255,180,0,.3);padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#0a0a0a}
+#sidebar::-webkit-scrollbar{width:3px}
+#sidebar::-webkit-scrollbar-thumb{background:rgba(255,180,0,.3)}
+.panel{border:1px solid rgba(255,180,0,.4);padding:10px}
+.panel.hidden{display:none}
+.phd{font-size:10px;font-weight:700;letter-spacing:.08em;border-bottom:1px solid var(--ydim2);padding-bottom:5px;margin-bottom:8px}
+.lbl{font-size:9px;color:var(--ydim);display:block;margin-bottom:2px}
+.stat{font-size:10px;line-height:1.8;color:var(--ydim)}
+select,input[type=text]{background:#0d0d0d;color:var(--y);border:1px solid rgba(255,180,0,.4);padding:6px 8px;width:100%;outline:none;-webkit-appearance:none;appearance:none;font-family:inherit;font-size:11px;text-transform:uppercase;display:block;margin-bottom:8px}
+option,optgroup{background:#111;color:var(--y)}
+.btn{background:var(--y);color:#000;font-weight:700;width:100%;padding:8px;border:none;font-family:inherit;text-transform:uppercase;font-size:11px;cursor:pointer;transition:opacity .2s;margin-top:2px}
+.btn:hover{opacity:.8}
+.btn-ghost{background:none;border:none;color:var(--y);font-size:10px;text-decoration:underline;cursor:pointer;font-family:inherit;text-transform:uppercase;display:block;text-align:center;margin-top:6px;width:100%}
+.scan-timers{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.scan-row{display:flex;align-items:center;justify-content:space-between;font-size:10px}
+.scan-row .scan-label{opacity:.5}
+.scan-row .scan-cd{font-weight:700;font-variant-numeric:tabular-nums}
+.scan-bar{height:2px;background:var(--ydim3);margin-top:1px;border-radius:1px;overflow:hidden}
+.scan-fill{height:100%;background:var(--y);transition:width 1s linear}
+.auto-row{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:10px}
+.toggle{position:relative;width:30px;height:16px;cursor:pointer;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle .slider{position:absolute;inset:0;background:#333;border-radius:8px;transition:.2s}
+.toggle .slider::before{content:'';position:absolute;height:12px;width:12px;left:2px;bottom:2px;background:#666;border-radius:50%;transition:.2s}
+.toggle input:checked+.slider{background:rgba(255,180,0,.4)}
+.toggle input:checked+.slider::before{transform:translateX(14px);background:var(--y)}
+#viewport{position:relative;overflow:hidden;background:#000;display:flex;flex-direction:column}
+.view{display:none;width:100%;flex:1;min-height:0;position:relative;overflow:hidden}
+.view.active{display:flex;flex-direction:column}
+#globe-wrap{width:100%;height:100%;cursor:grab}
+#globe-wrap:active{cursor:grabbing}
+#globe-canvas{display:block;width:100%;height:100%}
+.sat-lbl{position:absolute;font-size:9px;pointer-events:none;text-shadow:0 0 6px #000;z-index:10;letter-spacing:.05em}
+#sat-tip{position:absolute;background:rgba(0,0,0,.92);border:1px solid var(--y);padding:5px 10px;font-size:10px;pointer-events:none;z-index:20;display:none;line-height:1.6}
+#sat-img{max-width:100%;max-height:100%;object-fit:contain;display:none;transition:opacity .3s}
+#img-ph{text-align:center;opacity:.2;padding:30px}
+#img-bar{position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--ydim3);display:none}
+#img-fill{height:100%;background:var(--y);width:0;transition:width .25s}
+#img-link-row{position:absolute;bottom:10px;right:14px;display:none;font-size:10px;z-index:10}
+#img-link-row a{color:var(--y);text-decoration:underline}
+#img-timestamp{position:absolute;top:10px;left:14px;font-size:10px;opacity:.6;display:none;z-index:10}
+#img-refresh-badge{position:absolute;top:10px;right:14px;font-size:9px;display:none;z-index:10;padding:3px 8px;border:1px solid var(--ydim2);background:rgba(0,0,0,.7)}
+#nws-view{flex-direction:column;overflow-y:auto;padding:14px;background:#000}
+#nws-view::-webkit-scrollbar{width:4px}
+#nws-view::-webkit-scrollbar-thumb{background:rgba(255,180,0,.3)}
+#nws-content{width:100%}
+.nws-hdr{font-size:13px;font-weight:700;margin-bottom:4px}
+.nws-sub{font-size:10px;opacity:.4;margin-bottom:14px}
+.nws-current{border:1px solid rgba(255,180,0,.4);padding:12px;margin-bottom:14px;display:flex;gap:16px;align-items:flex-start}
+.nws-current-temp{font-size:36px;font-weight:700;line-height:1;flex-shrink:0}
+.nws-current-detail{font-size:10px;line-height:1.7;opacity:.7}
+.nws-current-short{font-size:11px;font-weight:700;margin-bottom:4px}
+.nws-section-hd{font-size:9px;opacity:.4;border-bottom:1px solid rgba(255,180,0,.15);padding-bottom:4px;margin-bottom:8px;letter-spacing:.08em}
+.nws-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:14px}
+.nws-card{border:1px solid rgba(255,180,0,.25);padding:8px;background:rgba(255,180,0,.02);transition:border-color .2s}
+.nws-card:hover{border-color:var(--y)}
+.nws-card-name{font-size:9px;opacity:.5;margin-bottom:2px}
+.nws-card-temp{font-size:20px;font-weight:700}
+.nws-card-wind{font-size:9px;opacity:.5;margin-top:2px}
+.nws-card-short{font-size:10px;margin-top:4px;line-height:1.4}
+.nws-hourly{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px}
+.nws-hourly::-webkit-scrollbar{height:3px}
+.nws-hourly::-webkit-scrollbar-thumb{background:rgba(255,180,0,.3)}
+.nws-hr{border:1px solid var(--ydim2);padding:8px 10px;text-align:center;flex-shrink:0;min-width:70px;transition:border-color .2s}
+.nws-hr:hover{border-color:var(--y)}
+.nws-hr-time{font-size:9px;opacity:.45;margin-bottom:3px}
+.nws-hr-temp{font-size:16px;font-weight:700}
+.nws-hr-wind{font-size:8px;opacity:.4;margin-top:2px}
+.nws-hr-short{font-size:9px;margin-top:3px;line-height:1.3}
+.nws-placeholder{display:flex;align-items:center;justify-content:center;height:100%}
+.nws-alerts{border:1px solid rgba(255,80,0,.5);padding:10px;margin-bottom:14px;font-size:10px;line-height:1.6;color:#ff8844}
+.nws-ext-link{font-size:9px;opacity:.4;margin-top:8px}
+.nws-ext-link a{color:var(--y)}
+.loc-search-wrap{position:relative;margin-bottom:8px}
+#locSearchIn{margin-bottom:0}
+#locResults{position:absolute;top:100%;left:0;right:0;background:#111;border:1px solid rgba(255,180,0,.4);border-top:none;max-height:180px;overflow-y:auto;z-index:50;display:none}
+#locResults::-webkit-scrollbar{width:3px}
+#locResults::-webkit-scrollbar-thumb{background:rgba(255,180,0,.3)}
+.loc-item{padding:6px 8px;font-size:10px;cursor:pointer;border-bottom:1px solid var(--ydim3);text-transform:none}
+.loc-item:hover{background:rgba(255,180,0,.1)}
+.loc-item small{opacity:.5;display:block;font-size:9px;margin-top:1px;text-transform:uppercase}
+.scanline{width:100%;height:70px;position:absolute;top:-70px;z-index:5;pointer-events:none;background:linear-gradient(0deg,transparent,rgba(255,180,0,.03) 50%,transparent);animation:scan 9s linear infinite;will-change:transform}
+@keyframes scan{0%{top:-70px}100%{top:100%}}
+.pulse{animation:blink 1.1s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .3s ease-out both}
+
+.nws-graph-block{margin-bottom:18px}
+.nws-graph-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.nws-graph-item{min-width:0}
+.nws-graph-item--wide{grid-column:1/-1}
+.nws-graph-lbl{font-size:9px;opacity:.45;margin-bottom:3px;text-transform:uppercase;letter-spacing:.07em}.nws-graph-lbl-sm{font-size:7px;opacity:.38;margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em}
+.nws-graph-svg{width:100%;height:80px;display:block;overflow:visible}
+.nws-graph-bar{width:100%;height:60px;display:block;overflow:visible}
+.nws-winddir-wrap{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.nws-wd-cell{border:1px solid rgba(255,180,0,.2);padding:4px 6px;text-align:center;min-width:48px;flex:1}
+.nws-wd-card{font-size:11px;font-weight:700;color:#a3e635}
+.nws-wd-deg{font-size:8px;opacity:.45;margin-top:1px}
+.nws-wd-spd{font-size:8px;opacity:.55}
+.nws-wd-time{font-size:7px;opacity:.35;margin-top:1px}
+
+/* ── MOBILE RESPONSIVE ───────────────────────────────────────── */
+.menu-toggle{display:none;align-items:center;justify-content:center;width:38px;height:38px;min-width:38px;background:transparent;border:1px solid var(--y);color:var(--y);font-size:20px;cursor:pointer;flex-shrink:0;font-family:inherit;padding:0;line-height:1;-webkit-tap-highlight-color:transparent}
+#mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:98;-webkit-tap-highlight-color:transparent}
+#mob-overlay.mob-open{display:block}
+@media(max-width:768px){
+  html,body{height:100svh;height:100dvh;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  .menu-toggle{display:flex}
+  #header{padding:8px 10px;gap:6px;flex-wrap:nowrap}
+  #header>div:first-child{gap:8px;flex-wrap:nowrap;min-width:0;flex:1;overflow:hidden}
+  #header h1{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab-btn{white-space:nowrap;padding:6px 9px;font-size:10px;min-height:36px}
+  #clock{font-size:12px;flex-shrink:0}
+  #clock small{font-size:7px}
+  #statusbar{font-size:9px;padding:3px 10px}
+  #body{grid-template-columns:1fr}
+  #sidebar{
+    position:fixed;top:0;left:-110%;
+    width:82%;max-width:310px;height:100%;
+    z-index:99;background:#0a0a0a;
+    border-right:1px solid var(--y);
+    transition:left .25s cubic-bezier(.4,0,.2,1);
+    overflow-y:auto;padding:10px;
+    padding-top:calc(10px + env(safe-area-inset-top));
+    padding-left:calc(10px + env(safe-area-inset-left));
+    -webkit-overflow-scrolling:touch
+  }
+  #sidebar.mob-open{left:0}
+  select,input[type=text]{font-size:16px!important}
+  .btn{padding:12px 8px;min-height:44px}
+  .btn-ghost{min-height:36px;padding:6px}
+  .nws-grid{grid-template-columns:1fr 1fr}
+  .nws-graph-row{grid-template-columns:1fr}
+  .nws-current-temp{font-size:26px}
+  #view-nws{-webkit-overflow-scrolling:touch}
+  #globe-wrap{touch-action:none}
+  #sat-tip{font-size:11px;padding:6px 10px;max-width:180px;line-height:1.5}
+  .toggle{width:36px;height:20px}
+  .toggle .slider::before{width:14px;height:14px}
+  .toggle input:checked+.slider::before{transform:translateX(16px)}
+  .auto-row{gap:8px;font-size:11px}
+  .phd{font-size:10px;padding-bottom:6px;margin-bottom:10px}
+  .lbl{font-size:10px;margin-bottom:4px}
+  .panel{padding:12px}
+}
+@media(max-width:480px){
+  .nws-grid{grid-template-columns:1fr}
+  #header h1{font-size:10px}
+  .tab-btn{font-size:9px;padding:5px 7px}
+  #clock{font-size:11px}
+}
+
+</style>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js')
+      .then(function(){console.log('SW: registered');})
+      .catch(function(e){console.warn('SW: failed',e);});
+  });
+}
+</script>
+</head>
+<body>
+<div id="mob-overlay" onclick="toggleMobSidebar()"></div>
+<div id="header">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <button class="menu-toggle" onclick="toggleMobSidebar()" aria-label="Toggle Sidebar">&#9776;</button><h1>GOES-STAR // COMMAND</h1>
+    <div class="tabs">
+      <button class="tab-btn" onclick="switchTab('3d',this)">3D ORBITAL</button>
+      <button class="tab-btn active" onclick="switchTab('loops',this)">LIVE IMAGERY</button>
+      <button class="tab-btn" onclick="switchTab('nws',this)">NWS GROUND</button>
+    </div>
+  </div>
+  <div id="clock"><small>SCAN CYCLE SYNC</small>00:00:00 UTC</div>
+</div>
+<div id="statusbar">
+  <div id="statusbar-left"><div id="dot"></div><span id="feed-label">FEED OFFLINE // NO SIGNAL</span></div>
+  <span id="res-label" style="opacity:.4">—</span>
+</div>
+<div id="body">
+  <div id="sidebar">
+    <div id="panel-3d" class="panel hidden">
+      <div class="phd">ORBITAL DATA</div>
+      <div class="stat"><span style="color:var(--y)">● GOES-19 &nbsp;75.2°W EAST</span><br><span style="color:#00cfff">● GOES-18 137.2°W WEST</span><br><br>ALT &nbsp;&nbsp;: 35,786 KM GEO<br>INC &nbsp;&nbsp;: 0.0° EQUATORIAL<br>PERIOD: 23H 56M 04S</div>
+      <div class="phd" style="margin-top:10px">LIVE ENVIRONMENT</div>
+      <div class="stat" id="sun-info">SUN: CALCULATING...<br>TERMINATOR: ACTIVE<br>EARTH: GMST SYNC</div>
+      <div class="phd" style="margin-top:10px">SCAN SCHEDULE — MODE 6</div>
+      <div class="scan-timers">
+        <div><div class="scan-row"><span class="scan-label">FULL DISK</span><span class="scan-cd cd-fd">--:--</span></div><div class="scan-bar"><div class="scan-fill sf-fd"></div></div></div>
+        <div><div class="scan-row"><span class="scan-label">CONUS / PACUS</span><span class="scan-cd cd-co">--:--</span></div><div class="scan-bar"><div class="scan-fill sf-co"></div></div></div>
+        <div><div class="scan-row"><span class="scan-label">MESOSCALE</span><span class="scan-cd cd-ms">--:--</span></div><div class="scan-bar"><div class="scan-fill sf-ms"></div></div></div>
+      </div>
+      <div class="phd" style="margin-top:10px">CONTROLS</div>
+      <div class="stat">DRAG → ROTATE<br>SCROLL → ZOOM<br>HOVER → SAT INFO</div>
+      <div class="phd" style="margin-top:10px">LEGEND</div>
+      <div class="stat"><span style="color:var(--y)">■</span> GOES-19 EAST<br><span style="color:#00cfff">■</span> GOES-18 WEST<br><span style="color:var(--ydim2)">──</span> GRID 10°<br><span style="color:var(--ydim)">──</span> EQUATOR<br><span style="color:rgba(0,207,255,.2)">──</span> GEO ORBIT RING</div>
+    </div>
+    <div id="panel-loops" class="panel">
+      <div class="phd">TARGET PARAMETERS</div>
+      <span class="lbl">SATELLITE / SECTOR</span>
+      <select id="sectorSel">
+        <option value="" disabled selected>-- UNASSIGNED --</option>
+        <optgroup label="── GOES-EAST (G19) ──">
+          <option value="GOES19|FD|1808x1808">Full Disk — GOES-East</option>
+          <option value="GOES19|CONUS|1250x750">CONUS — GOES-East</option>
+          <option value="GOES19|SECTOR/can|1200x1200">Canada / Northern U.S.</option>
+          <option value="GOES19|SECTOR/na|1200x1200">Northern Atlantic</option>
+          <option value="GOES19|SECTOR/nr|1200x1200">Northern Rockies</option>
+          <option value="GOES19|SECTOR/umv|1200x1200">Upper Mississippi Valley</option>
+          <option value="GOES19|SECTOR/cgl|1200x1200">Great Lakes</option>
+          <option value="GOES19|SECTOR/ne|1200x1200">Northeast</option>
+          <option value="GOES19|SECTOR/sr|1200x1200">Southern Rockies</option>
+          <option value="GOES19|SECTOR/sp|1200x1200">Southern Plains</option>
+          <option value="GOES19|SECTOR/smv|1200x1200">S. Mississippi Valley</option>
+          <option value="GOES19|SECTOR/se|1200x1200">Southeast</option>
+          <option value="GOES19|SECTOR/eus|1200x1200">U.S. Atlantic Coast</option>
+          <option value="GOES19|SECTOR/mex|1200x1200">Mexico</option>
+          <option value="GOES19|SECTOR/ga|1200x1200">Gulf of America</option>
+          <option value="GOES19|SECTOR/car|1200x1200">Caribbean</option>
+          <option value="GOES19|SECTOR/taw|1200x1200">Tropical Atlantic</option>
+          <option value="GOES19|SECTOR/pr|1200x1200">Puerto Rico</option>
+        </optgroup>
+        <optgroup label="── GOES-WEST (G18) ──">
+          <option value="GOES18|FD|1808x1808">Full Disk — GOES-West</option>
+          <option value="GOES18|CONUS|1250x750">PACUS — GOES-West</option>
+          <option value="GOES18|SECTOR/ak|1200x1200">Alaska</option>
+          <option value="GOES18|SECTOR/cak|1200x1200">Central Alaska</option>
+          <option value="GOES18|SECTOR/sea|1200x1200">SE Alaska</option>
+          <option value="GOES18|SECTOR/np|1200x1200">Northern Pacific</option>
+          <option value="GOES18|SECTOR/wus|1200x1200">U.S. Pacific Coast</option>
+          <option value="GOES18|SECTOR/pnw|1200x1200">Pacific Northwest</option>
+          <option value="GOES18|SECTOR/psw|1200x1200">Pacific Southwest</option>
+          <option value="GOES18|SECTOR/gwas|1200x1200">GOES-West All States</option>
+          <option value="GOES18|SECTOR/hi|1200x1200">Hawaii</option>
+          <option value="GOES18|SECTOR/tpw|1200x1200">Tropical Pacific</option>
+        </optgroup>
+      </select>
+      <span class="lbl">SPECTRAL BAND</span>
+      <select id="bandSel">
+        <option value="" disabled selected>-- UNASSIGNED --</option>
+        <optgroup label="── RGB COMPOSITES ──">
+          <option value="GEOCOLOR">GeoColor — True Color</option>
+          <option value="AirMass">Air Mass RGB</option>
+          <option value="Sandwich">Sandwich RGB</option>
+          <option value="FireTemperature">Fire Temperature</option>
+          <option value="Dust">Dust RGB</option>
+          <option value="DayNightCloudMicroCombo">Day/Night Cloud Micro</option>
+          <option value="DMW">Derived Motion Winds</option>
+          <option value="EXTENT3">GLM Flash Extent</option>
+        </optgroup>
+        <optgroup label="── ABI BANDS ──">
+          <option value="01">Band 01 — VIS Blue 0.47µm</option>
+          <option value="02">Band 02 — VIS Red 0.64µm</option>
+          <option value="03">Band 03 — NIR Veggie</option>
+          <option value="04">Band 04 — NIR Cirrus</option>
+          <option value="05">Band 05 — NIR Snow/Ice</option>
+          <option value="06">Band 06 — NIR Cloud</option>
+          <option value="07">Band 07 — IR Shortwave</option>
+          <option value="08">Band 08 — WV Upper</option>
+          <option value="09">Band 09 — WV Mid</option>
+          <option value="10">Band 10 — WV Lower</option>
+          <option value="11">Band 11 — IR Cloud Phase</option>
+          <option value="12">Band 12 — IR Ozone</option>
+          <option value="13">Band 13 — IR Clean LW</option>
+          <option value="14">Band 14 — IR Longwave</option>
+          <option value="15">Band 15 — IR Dirty LW</option>
+          <option value="16">Band 16 — IR CO2 LW</option>
+        </optgroup>
+      </select>
+      <span class="lbl">ANIMATION FRAMES</span><select id="frameCountSel"><option value="6">6 FRAMES</option><option value="10">10 FRAMES</option><option value="16" selected>16 FRAMES</option><option value="20">20 FRAMES</option><option value="30">30 FRAMES</option></select><button class="btn" onclick="syncImage()">SYNC LATEST IMAGE</button>
+      <button class="btn-ghost" onclick="manualRefresh()" id="manualRefreshBtn" style="display:none">↻ MANUAL REFRESH</button>
+      <button class="btn-ghost" onclick="resetLoop()">EMERGENCY SYSTEM RESET</button>
+      <div class="auto-row" id="autoRefreshRow" style="display:none">
+        <label class="toggle"><input type="checkbox" id="autoRefreshChk" checked onchange="toggleAutoRefresh()"><span class="slider"></span></label>
+        <span>AUTO-REFRESH <span id="autoRefreshCd" style="opacity:.5"></span></span>
+      </div>
+      <div class="phd" style="margin-top:10px">SCAN SCHEDULE — MODE 6</div>
+      <div class="scan-timers">
+        <div><div class="scan-row"><span class="scan-label">FULL DISK (10 MIN)</span><span class="scan-cd cd-fd">--:--</span></div><div class="scan-bar"><div class="scan-fill sf-fd"></div></div></div>
+        <div><div class="scan-row"><span class="scan-label">CONUS / PACUS (5 MIN)</span><span class="scan-cd cd-co">--:--</span></div><div class="scan-bar"><div class="scan-fill sf-co"></div></div></div>
+        <div><div class="scan-row"><span class="scan-label">MESOSCALE (1 MIN)</span><span class="scan-cd cd-ms">--:--</span></div><div class="scan-bar"><div class="scan-fill sf-ms"></div></div></div>
+      </div>
+    </div>
+    <div id="panel-nws" class="panel hidden">
+      <div class="phd">GROUND STATION</div>
+      <span class="lbl">SEARCH — ZIP CODE, CITY, OR STATE</span>
+      <div class="loc-search-wrap">
+        <input type="text" id="locSearchIn" placeholder="E.G. 30301 OR ATLANTA, GA" autocomplete="off" oninput="debounceLocSearch()" onkeydown="if(event.key==='Enter')acquireNWS()">
+        <div id="locResults"></div>
+      </div>
+      <button class="btn" onclick="acquireNWS()">ACQUIRE FORECAST</button>
+      <select id="nwsUnits" onchange="setNWSUnits(this.value)" style="background:#111;color:var(--y);border:1px solid var(--ydim2);font-family:inherit;font-size:10px;padding:3px 7px;cursor:pointer;letter-spacing:.05em"><option value="imperial">IMPERIAL</option><option value="metric">METRIC</option></select>
+      <button class="btn-ghost" onclick="nwsManualRefresh()" id="nwsRefreshBtn" style="display:none">↻ MANUAL REFRESH</button>
+      <button class="btn-ghost" onclick="clearNWS()">CLEAR STATION</button>
+      <div class="auto-row" id="nwsAutoRow" style="display:none">
+        <label class="toggle"><input type="checkbox" id="nwsAutoChk" checked onchange="toggleNWSAuto()"><span class="slider"></span></label>
+        <span>AUTO-REFRESH <span id="nwsAutoCd" style="opacity:.5"></span></span>
+      </div>
+      <div id="nws-loc-info" style="margin-top:8px;font-size:9px;opacity:.5;display:flex;align-items:center;gap:10px"><span id="nws-loc-text"></span><button id="nws-globe-btn" onclick="flyToNWSPin()" style="display:none;background:transparent;border:1px solid rgba(255,68,68,.5);color:#ff4444;font-family:inherit;font-size:9px;padding:2px 8px;cursor:pointer;letter-spacing:.06em">⊕ VIEW ON GLOBE</button></div>
+    </div>
+    <div class="panel" style="margin-top:auto">
+      <div class="stat" id="sys-status">* SYS: NOMINAL<br>* SRC: NOAA / NWS API<br>* STATION: IDLE</div>
+    </div>
+  </div>
+  <div id="viewport">
+    <div class="scanline"></div>
+    <div id="view-3d" class="view">
+      <div id="globe-wrap"><canvas id="globe-canvas"></canvas>
+        <div id="lbl-g19" class="sat-lbl" style="color:var(--y);display:none">G19-EAST 75.2°W</div>
+        <div id="lbl-g18" class="sat-lbl" style="color:#00cfff;display:none">G18-WEST 137.2°W</div>
+        <div id="sat-tip"></div>
+      </div>
+    </div>
+    <div id="view-loops" class="view active" style="align-items:center;justify-content:center;background:#000">
+      <div id="img-timestamp"></div>
+      <div id="img-refresh-badge"></div>
+      <img id="sat-img" alt="GOES Satellite Imagery">
+      <div id="img-ph"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin:0 auto 12px"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><div style="font-size:11px">AWAITING SECTOR AND BAND SELECTION</div></div>
+      <div id="img-bar"><div id="img-fill"></div></div>
+      <div id="img-link-row"></div>
+    </div>
+    <div id="view-nws" class="view" style="overflow-y:auto;padding:14px;background:#000">
+      <div id="nws-content"><div class="nws-placeholder" style="height:300px"><div style="text-align:center;opacity:.2"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin:0 auto 12px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg><div style="font-size:11px">SEARCH FOR A U.S. LOCATION TO ACQUIRE NWS FORECAST DATA</div></div></div></div>
+    </div>
+  </div>
+</div>
+<script>
+(function tick(){document.getElementById('clock').innerHTML='<small>SCAN CYCLE SYNC</small>'+new Date().toISOString().split('T')[1].split('.')[0]+' UTC';setTimeout(tick,1000)})();
+function setStatus(d,l,r){document.getElementById('dot').style.background=d;if(l)document.getElementById('feed-label').textContent=l;if(r)document.getElementById('res-label').textContent=r}
+function setSys(h){document.getElementById('sys-status').innerHTML=h}
+function updateScanTimers(){var n=new Date(),s=n.getUTCMinutes()*60+n.getUTCSeconds(),fdR=600-s%600,coR=300-s%300,msR=60-s%60;function f(x){return Math.floor(x/60)+':'+String(x%60).padStart(2,'0')}document.querySelectorAll('.cd-fd').forEach(function(e){e.textContent=f(fdR)});document.querySelectorAll('.cd-co').forEach(function(e){e.textContent=f(coR)});document.querySelectorAll('.cd-ms').forEach(function(e){e.textContent=f(msR)});document.querySelectorAll('.sf-fd').forEach(function(e){e.style.width=(s%600/600*100)+'%'});document.querySelectorAll('.sf-co').forEach(function(e){e.style.width=(s%300/300*100)+'%'});document.querySelectorAll('.sf-ms').forEach(function(e){e.style.width=(s%60/60*100)+'%'})}
+setInterval(updateScanTimers,1000);updateScanTimers();
+var nwsActive=false;
+function switchTab(t,el){document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});el.classList.add('active');document.querySelectorAll('.panel').forEach(function(p){p.classList.add('hidden')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});document.getElementById('panel-'+t).classList.remove('hidden');document.getElementById('view-'+t).classList.add('active');if(t==='3d'){setStatus('#22c55e','3D ORBITAL VIEW // REAL-TIME POSITIONING','G19: 75.2°W | G18: 137.2°W');setSys('* SYS: NOMINAL<br>* VIEW: 3D ORBITAL<br>* POSITIONING: REAL-TIME');if(!globeReady)initGlobe()}else if(t==='loops'){if(currentImgUrl)setStatus('#22c55e','ACTIVE // '+lastSat+' — '+lastPath+' — '+lastBand,lastRes);else setStatus('#444','FEED OFFLINE // NO SIGNAL','—');setSys('* SYS: NOMINAL<br>* SRC: CDN.STAR.NESDIS.NOAA.GOV<br>* STATION: '+(currentImgUrl?'ACTIVE':'IDLE'))}else if(t==='nws'){if(!nwsActive)setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: '+(nwsActive?'ACTIVE':'IDLE'))}document.getElementById('sys-status').parentElement.classList.remove('hidden')}
+
+/* 3D GLOBE */
+var globeReady=false,rdr,scn,cam,grp,eMesh,cMesh,g19m,g18m,dragging=false,pM={x:0,y:0};
+var _frameN=0;function initGlobe(){globeReady=true;var wrap=document.getElementById('globe-wrap'),W=wrap.clientWidth,H=wrap.clientHeight,canvas=document.getElementById('globe-canvas');rdr=new THREE.WebGLRenderer({canvas:canvas,antialias:true});rdr.setSize(W,H);rdr.setPixelRatio(Math.min(devicePixelRatio,2));rdr.setClearColor(0x000000,1);scn=new THREE.Scene();cam=new THREE.PerspectiveCamera(38,W/H,.01,500);cam.position.z=2.9;grp=new THREE.Group();scn.add(grp);var starGroup=new THREE.Group();scn.add(starGroup);var sp=[];for(var i=0;i<8000;i++){var ph=Math.acos(2*Math.random()-1),th=2*Math.PI*Math.random(),r=80+Math.random()*120;sp.push(r*Math.sin(ph)*Math.cos(th),r*Math.sin(ph)*Math.sin(th),r*Math.cos(ph))}var sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));starGroup.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:.12,transparent:true,opacity:.72,sizeAttenuation:false})));var sp2=[];for(var i=0;i<400;i++){var ph2=Math.acos(2*Math.random()-1),th2=2*Math.PI*Math.random(),r2=85+Math.random()*110;sp2.push(r2*Math.sin(ph2)*Math.cos(th2),r2*Math.sin(ph2)*Math.sin(th2),r2*Math.cos(ph2))}var sg2=new THREE.BufferGeometry();sg2.setAttribute('position',new THREE.Float32BufferAttribute(sp2,3));starGroup.add(new THREE.Points(sg2,new THREE.PointsMaterial({color:0xffffff,size:.26,transparent:true,opacity:.92,sizeAttenuation:false})));scn.add(new THREE.AmbientLight(0x3a5f8a,.28));var sun=new THREE.DirectionalLight(0xfff8e8,2.8);grp.add(sun);function getSunDir(){var now=new Date(),jd=now.getTime()/864e5+2440587.5,n=jd-2451545.0,L=(280.46+.9856474*n)%360,g=((357.528+.9856003*n)%360)*Math.PI/180,lambda=((L+1.915*Math.sin(g)+.02*Math.sin(2*g))%360)*Math.PI/180,eps=23.439*Math.PI/180,ra=Math.atan2(Math.cos(eps)*Math.sin(lambda),Math.cos(lambda)),dec=Math.asin(Math.sin(eps)*Math.sin(lambda)),gmst=((280.46061837+360.98564736629*n)%360)*Math.PI/180;return{ra:ra,dec:dec,gmst:gmst}}function updateSun(){var s=getSunDir(),d=14;var localA=s.ra-(baseYRot-s.gmst);sun.position.set(d*Math.cos(s.dec)*Math.cos(localA),d*Math.sin(s.dec),d*Math.cos(s.dec)*Math.sin(localA));if(typeof sunGlimmer!=="undefined"&&sunGlimmer&&grp){var wp=sun.position.clone();grp.localToWorld(wp);sunGlimmer.position.copy(wp);}}updateSun();var sunGlimmer=null;(function(){var sc=document.createElement("canvas");sc.width=64;sc.height=64;var sx=sc.getContext("2d");var gr=sx.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,"rgba(255,248,200,1)");gr.addColorStop(0.12,"rgba(255,220,80,0.9)");gr.addColorStop(0.4,"rgba(255,180,0,0.35)");gr.addColorStop(1,"rgba(255,140,0,0)");sx.fillStyle=gr;sx.fillRect(0,0,64,64);var stex=new THREE.CanvasTexture(sc);var smat=new THREE.SpriteMaterial({map:stex,transparent:true,opacity:0.9,depthWrite:false,blending:THREE.AdditiveBlending});sunGlimmer=new THREE.Sprite(smat);sunGlimmer.scale.set(0.6,0.6,1);scn.add(sunGlimmer);})();eMesh=new THREE.Mesh(new THREE.SphereGeometry(1,96,96),new THREE.MeshPhongMaterial({color:0x0d2d4a,shininess:22,specular:new THREE.Color(0x1a3a5c)}));grp.add(eMesh);var ldr=new THREE.TextureLoader(),TEX=['https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg','https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg','https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg'];function tryTex(i){if(i>=TEX.length)return;ldr.load(TEX[i],function(tex){eMesh.material.map=tex;eMesh.material.color.set(0xffffff);eMesh.material.needsUpdate=true},undefined,function(){tryTex(i+1)})}tryTex(0);ldr.load('https://unpkg.com/three-globe/example/img/earth-water.png',function(tex){eMesh.material.specularMap=tex;eMesh.material.specular.set(0x4488aa);eMesh.material.shininess=32;eMesh.material.needsUpdate=true});ldr.load('https://unpkg.com/three-globe/example/img/earth-clouds.png',function(tex){cMesh=new THREE.Mesh(new THREE.SphereGeometry(1.010,64,64),new THREE.MeshPhongMaterial({map:tex,transparent:true,opacity:.36,depthWrite:false}));grp.add(cMesh)});grp.add(new THREE.Mesh(new THREE.SphereGeometry(1.035,64,64),new THREE.MeshPhongMaterial({color:0x1a6aff,transparent:true,opacity:.10,side:THREE.FrontSide,depthWrite:false})));grp.add(new THREE.Mesh(new THREE.SphereGeometry(1.07,64,64),new THREE.MeshPhongMaterial({color:0x0044cc,transparent:true,opacity:.04,side:THREE.FrontSide,depthWrite:false})));buildGrid();var OR=1.75,opts=[];for(var i=0;i<=256;i++){var a=i/256*Math.PI*2;opts.push(new THREE.Vector3(OR*Math.cos(a),0,OR*Math.sin(a)))}grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(opts),new THREE.LineBasicMaterial({color:0x00cfff,transparent:true,opacity:.2})));g19m=makeSat(0xffb400);g18m=makeSat(0x00cfff);placeSat(g19m,-75.2,OR);placeSat(g18m,-137.2,OR);grp.add(g19m);grp.add(g18m);addTie(-75.2,OR,0xffb400);addTie(-137.2,OR,0x00cfff);wrap.addEventListener('mousedown',function(e){dragging=true;pM={x:e.clientX,y:e.clientY}});window.addEventListener('mouseup',function(){dragging=false});window.addEventListener('mousemove',function(e){if(!dragging){hoverCheck(e,wrap);return}baseYRot+=(e.clientX-pM.x)*.004;grp.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,grp.rotation.x+(e.clientY-pM.y)*.004));pM={x:e.clientX,y:e.clientY}});wrap.addEventListener('wheel',function(e){e.preventDefault();cam.position.z=Math.max(1.4,Math.min(8,cam.position.z+e.deltaY*.004))},{passive:false});var lt=null,_pinchD=null,_tapX=0,_tapY=0,_tapMv=false;wrap.addEventListener('touchstart',function(e){if(e.touches.length===2){lt=null;_pinchD=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}else{lt=e.touches[0];_tapX=e.touches[0].clientX;_tapY=e.touches[0].clientY;_tapMv=false;}});wrap.addEventListener('touchmove',function(e){e.preventDefault();if(e.touches.length===2){var d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(_pinchD)cam.position.z=Math.max(1.4,Math.min(8,cam.position.z*(_pinchD/d)));_pinchD=d;lt=null;}else{if(!lt)return;var dx=e.touches[0].clientX-lt.clientX,dy=e.touches[0].clientY-lt.clientY;if(Math.abs(dx)>4||Math.abs(dy)>4)_tapMv=true;baseYRot+=dx*.004;grp.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,grp.rotation.x+dy*.004));lt=e.touches[0];}},{passive:false});wrap.addEventListener('touchend',function(e){if(!_tapMv&&e.changedTouches.length===1){hoverCheck({clientX:_tapX,clientY:_tapY},wrap);setTimeout(function(){document.getElementById('sat-tip').style.display='none';},3000);}_pinchD=null;_tapMv=false;});var rc=new THREE.Raycaster(),mv=new THREE.Vector2();function hoverCheck(e,wrap){var rect=wrap.getBoundingClientRect();mv.x=(e.clientX-rect.left)/rect.width*2-1;mv.y=-((e.clientY-rect.top)/rect.height)*2+1;rc.setFromCamera(mv,cam);var hits=rc.intersectObjects([g19m,g18m],true),tip=document.getElementById('sat-tip');if(hits.length>0){var isG19=hits[0].object.parent===g19m;if(typeof showSatCone==='function')showSatCone(isG19?g19m:g18m,isG19?0xffb400:0x00cfff);tip.style.display='block';tip.style.left=(e.clientX-rect.left+16)+'px';tip.style.top=(e.clientY-rect.top+16)+'px';tip.innerHTML='<b>'+(isG19?'GOES-19 (EAST)':'GOES-18 (WEST)')+'</b><br>LON: '+(isG19?'75.2':'137.2')+'°W<br>LAT: 0.0° N<br>ALT: 35,786 KM<br>MODE: 6 (10-MIN FLEX)'}else{tip.style.display='none';if(typeof hideSatCone==='function')hideSatCone();}}window.addEventListener('resize',function(){var nW=wrap.clientWidth,nH=wrap.clientHeight;rdr.setSize(nW,nH);cam.aspect=nW/nH;cam.updateProjectionMatrix()});var tMesh=null;function makeTerm(){var geo=new THREE.CircleGeometry(1.015,64);var mat=new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.55,side:THREE.DoubleSide,depthWrite:false});tMesh=new THREE.Mesh(geo,mat);grp.add(tMesh)}makeTerm();var sunInfoTick=0;function updateTerminator(){if(!tMesh)return;tMesh.lookAt(sun.position.clone());tMesh.position.set(0,0,0);sunInfoTick++;if(sunInfoTick%60===0){var s=getSunDir(),raD=(s.ra*180/Math.PI+360)%360,decD=s.dec*180/Math.PI,gmstD=(s.gmst*180/Math.PI+360)%360,subLon=((raD-gmstD+540)%360-180).toFixed(1);document.getElementById('sun-info').innerHTML='SUB-SOLAR: '+decD.toFixed(1)+'°N, '+subLon+'°'+(subLon<0?'W':'E')+'<br>TERMINATOR: ACTIVE<br>EARTH: GMST '+gmstD.toFixed(1)+'°'}}var baseYRot=0;(function loop(){requestAnimationFrame(loop);var _gw=document.getElementById('globe-wrap');if(!_gw||_gw.offsetParent===null)return;var s=getSunDir();grp.rotation.y=baseYRot-s.gmst;if(typeof starGroup!=="undefined")starGroup.rotation.y=baseYRot;if(cMesh)cMesh.rotation.y+=.0001;updateSun();updateTerminator();rdr.render(scn,cam);if(!(_frameN=(_frameN+1|0)%3))updateSatLabels()})()}
+function placeSat(m,lon,r){var phi=lon*Math.PI/180;m.position.set(r*Math.cos(phi),0,-r*Math.sin(phi))}
+function makeSat(color){var g=new THREE.Group();g.add(new THREE.Mesh(new THREE.BoxGeometry(.046,.024,.024),new THREE.MeshPhongMaterial({color:color,emissive:color,emissiveIntensity:.55})));[.068,-.068].forEach(function(x){var p=new THREE.Mesh(new THREE.BoxGeometry(.092,.003,.028),new THREE.MeshPhongMaterial({color:0x1a2e44,emissive:0x0c1e30}));p.position.x=x;g.add(p)});g.add(new THREE.Mesh(new THREE.SphereGeometry(.014,8,8),new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:.8})));return g}
+function addTie(lon,r,color){var phi=lon*Math.PI/180;grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(r*Math.cos(phi),0,-r*Math.sin(phi)),new THREE.Vector3(Math.cos(phi),0,-Math.sin(phi))]),new THREE.LineBasicMaterial({color:color,transparent:true,opacity:.25})))}
+function buildGrid(){var mF=function(op){return new THREE.LineBasicMaterial({color:0xffb400,transparent:true,opacity:op});};var mEq=mF(.55),m30=mF(.18),m10=mF(.06);for(var lat=-80;lat<=80;lat+=10){var pts=[],r=Math.cos(lat*Math.PI/180),y=Math.sin(lat*Math.PI/180);for(var i=0;i<=128;i++){var a=i/128*Math.PI*2;pts.push(new THREE.Vector3(r*Math.cos(a),y,r*Math.sin(a)))}grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lat===0?mEq:(lat%30===0?m30:m10)));}for(var lon=0;lon<360;lon+=10){var pts2=[],phi=lon*Math.PI/180;for(var j=0;j<=64;j++){var la=-90+j/64*180,rr=Math.cos(la*Math.PI/180),yy=Math.sin(la*Math.PI/180);pts2.push(new THREE.Vector3(rr*Math.cos(phi),yy,rr*Math.sin(phi)))}var isPrime=(lon===0||lon===180);grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts2),isPrime?mEq:(lon%30===0?m30:m10)));}}
+function updateSatLabels(){if(!grp||!cam)return;[[g19m,'lbl-g19'],[g18m,'lbl-g18']].forEach(function(pair){var m=pair[0],id=pair[1];if(!m)return;var pos=m.position.clone();grp.localToWorld(pos);var proj=pos.project(cam),el=document.getElementById(id);if(proj.z>1){el.style.display='none';return}var wrap=document.getElementById('globe-wrap');el.style.left=(proj.x*.5+.5)*wrap.clientWidth+8+'px';el.style.top=(-proj.y*.5+.5)*wrap.clientHeight-6+'px';el.style.display='block'})}
+
+/* LIVE IMAGERY — ANIMATED LOOP FROM NOAA CDN
+   CDN stores timestamped JPGs: {YYYYDDDHHMM}_{SAT}-ABI-{SECTOR}-{BAND}-{SIZE}.jpg
+   We load the last ~20 frames and cycle through them to create an animated loop.
+   Also keeps the "latest" static JPG URL as fallback. */
+var currentImgUrl='',lastSat='',lastPath='',lastBand='',lastRes='',autoRefreshTimer=null,autoRefreshCountdown=0;
+var animFrames=[],animIdx=0,animTimer=null,animPaused=false;
+function cdnUrl(sat,path,band,size){return'https://cdn.star.nesdis.noaa.gov/'+sat+'/ABI/'+path+'/'+band+'/'+size+'.jpg'}
+function tsFrameUrl(sat,path,band,size,d){var y=d.getUTCFullYear(),s=new Date(Date.UTC(y,0,1)),doy=Math.floor((d-s)/864e5)+1,hh=String(d.getUTCHours()).padStart(2,'0'),mm=String(d.getUTCMinutes()).padStart(2,'0'),ts=y+String(doy).padStart(3,'0')+hh+mm,sc;if(path==='FD')sc='FD';else if(path==='CONUS')sc='CONUS';else sc=path.split('/')[1];return'https://cdn.star.nesdis.noaa.gov/'+sat+'/ABI/'+path+'/'+band+'/'+ts+'_'+sat+'-ABI-'+sc+'-'+band+'-'+size+'.jpg'}
+function starUrl(sat,path,band){var sp=sat==='GOES19'?'G19':'G18';if(path==='FD')return'https://www.star.nesdis.noaa.gov/GOES/fulldisk_band.php?sat='+sp+'&band='+band+'&length=12';if(path==='CONUS')return'https://www.star.nesdis.noaa.gov/GOES/conus_band.php?sat='+sp+'&band='+band+'&length=12';return'https://www.star.nesdis.noaa.gov/GOES/sector_band.php?sat='+sp+'&sector='+path.split('/')[1]+'&band='+band+'&length=12'}
+function syncImage(){var sv=document.getElementById('sectorSel').value,bv=document.getElementById('bandSel').value;if(!sv||!bv){alert('SYSTEM ERROR: SELECT SECTOR AND BAND');return}var parts=sv.split('|'),sat=parts[0],rawPath=parts[1],size=parts[2];lastSat=sat;lastPath=rawPath;lastBand=bv;var sUrl=starUrl(sat,rawPath,bv),sizes;if(size==='1808x1808')sizes=['1808x1808','678x678','339x339'];else if(size==='1250x750')sizes=['1250x750','625x375'];else sizes=['1200x1200','600x600','300x300'];var img=document.getElementById('sat-img'),ph=document.getElementById('img-ph'),bar=document.getElementById('img-bar'),fill=document.getElementById('img-fill'),linkRow=document.getElementById('img-link-row'),tsEl=document.getElementById('img-timestamp');if(animTimer){clearInterval(animTimer);animTimer=null}animFrames=[];animIdx=0;animPaused=false;img.style.opacity='0.3';ph.style.display='block';ph.style.opacity='.5';ph.innerHTML='<div class="pulse" style="font-size:11px;margin:30px">ACQUIRING '+sat+' — '+rawPath+' — '+bv+'...</div>';bar.style.display='block';fill.style.width='0';linkRow.style.display='none';setStatus('#ffb400','ACQUIRING // '+sat+' '+rawPath+' '+bv,'LOADING');setSys('* STATUS: ACQUIRING<br>* SAT: '+sat+'<br>* BAND: '+bv);var pct=5,bt=setInterval(function(){pct=Math.min(pct+5,88);fill.style.width=pct+'%'},200);var si=0;function trySize(){if(si>=sizes.length){clearInterval(bt);bar.style.display='none';ph.style.display='block';ph.style.opacity='.9';ph.innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:11px;color:#ff8844;margin-bottom:6px">IMAGE NOT FOUND ON CDN</div><div style="font-size:10px;opacity:.5;margin-bottom:16px">THIS COMBINATION MAY NOT BE AVAILABLE.<br>TRY GEOCOLOR, OR OPEN STAR VIEWER:</div><a href="'+sUrl+'" target="_blank" style="display:inline-block;background:var(--y);color:#000;padding:9px 22px;font-size:11px;font-weight:700;text-decoration:none">VIEW IN STAR VIEWER ↗</a></div>';img.style.display='none';img.style.opacity='1';setStatus('#ff4444','SIGNAL LOST // OPEN IN STAR VIEWER','—');return}var url=cdnUrl(sat,rawPath,bv,sizes[si]),t=new Image();t.onload=function(){currentImgUrl=url;lastRes=t.naturalWidth+'x'+t.naturalHeight;ph.innerHTML='<div class="pulse" style="font-size:11px;margin:30px">LOADING ANIMATION FRAMES ('+sizes[si]+')...</div>';loadAnimFrames(sat,rawPath,bv,sizes[si],sUrl,bt)};t.onerror=function(){si++;trySize()};t.src=url+'?t='+Date.now()}trySize()}
+function loadAnimFrames(sat,path,band,size,sUrl,bt){var interval=(path==='FD')?10:5,now=new Date(),candidates=[],seen={};for(var i=0;i<48;i++){for(var off=-2;off<=2;off++){var t=new Date(now.getTime()-(i*interval+off)*60000);var k=t.getTime();if(!seen[k]){seen[k]=1;candidates.push(t)}}}var loaded=[],pending=candidates.length,started=false;var ph=document.getElementById('img-ph');candidates.forEach(function(d){var url=tsFrameUrl(sat,path,band,size,d);var im=new Image();im.onload=function(){loaded.push({time:d.getTime(),url:url});if(!started)ph.innerHTML='<div class="pulse" style="font-size:11px;margin:30px">FRAMES ACQUIRED: '+loaded.length+'...</div>';done()};im.onerror=function(){done()};im.src=url});function done(){pending--;if(!started&&loaded.length>=4){started=true;beginAnim(loaded,sat,path,band,size,sUrl,bt)}if(pending<=0&&!started){if(loaded.length>0){beginAnim(loaded,sat,path,band,size,sUrl,bt)}else{showStatic(sat,path,band,size,sUrl,bt)}}}}
+function beginAnim(loaded,sat,path,band,size,sUrl,bt){loaded.sort(function(a,b){return a.time-b.time});animFrames=loaded.slice(-(parseInt((document.getElementById('frameCountSel')||{}).value)||16));animIdx=0;if(bt)clearInterval(bt);var img=document.getElementById('sat-img'),ph=document.getElementById('img-ph'),bar=document.getElementById('img-bar'),fill=document.getElementById('img-fill'),linkRow=document.getElementById('img-link-row'),tsEl=document.getElementById('img-timestamp'),badge=document.getElementById('img-refresh-badge');fill.style.width='100%';setTimeout(function(){bar.style.display='none';fill.style.width='0'},400);ph.style.display='none';img.src=animFrames[0].url;img.style.display='block';img.style.opacity='1';var fc=animFrames.length;lastRes=size+' | '+fc+' FRAMES';setStatus('#22c55e','ACTIVE LOOP // '+lastSat+' — '+lastPath+' — '+lastBand,lastRes);setSys('* STATUS: ANIMATED LOOP<br>* SAT: '+lastSat+'<br>* FRAMES: '+fc+'<br>* AUTO-REFRESH: '+(document.getElementById('autoRefreshChk').checked?'ON':'OFF'));var fd=new Date(animFrames[0].time),ld=new Date(animFrames[fc-1].time);tsEl.style.display='block';linkRow.style.display='block';linkRow.innerHTML='<a href="'+currentImgUrl+'" target="_blank">LATEST STILL ↗</a> &nbsp;|&nbsp; <a href="'+sUrl+'" target="_blank">STAR VIEWER ↗</a>';document.getElementById('manualRefreshBtn').style.display='block';document.getElementById('autoRefreshRow').style.display='flex';if(animTimer)clearInterval(animTimer);animTimer=setInterval(function(){if(animPaused)return;animIdx=(animIdx+1)%animFrames.length;img.src=animFrames[animIdx].url;var ft=new Date(animFrames[animIdx].time);var hh=String(ft.getUTCHours()).padStart(2,'0'),mm=String(ft.getUTCMinutes()).padStart(2,'0');tsEl.textContent='FRAME '+(animIdx+1)+'/'+animFrames.length+' — '+hh+':'+mm+' UTC';badge.style.display='block';badge.textContent='▶ '+(animIdx+1)+'/'+animFrames.length},250);var ft0=new Date(animFrames[0].time);tsEl.textContent='FRAME 1/'+animFrames.length+' — '+String(ft0.getUTCHours()).padStart(2,'0')+':'+String(ft0.getUTCMinutes()).padStart(2,'0')+' UTC';badge.style.display='block';badge.textContent='▶ 1/'+animFrames.length;startAutoRefresh()}
+function showStatic(sat,path,band,size,sUrl,bt){if(bt)clearInterval(bt);var img=document.getElementById('sat-img'),ph=document.getElementById('img-ph'),bar=document.getElementById('img-bar'),fill=document.getElementById('img-fill'),linkRow=document.getElementById('img-link-row'),tsEl=document.getElementById('img-timestamp');fill.style.width='100%';setTimeout(function(){bar.style.display='none';fill.style.width='0'},400);ph.style.display='none';img.src=currentImgUrl+'?t='+Date.now();img.style.display='block';img.style.opacity='1';lastRes=size+' | STATIC';setStatus('#22c55e','ACTIVE (STATIC) // '+sat+' — '+path+' — '+lastBand,lastRes);setSys('* STATUS: STATIC (NO FRAMES FOUND)<br>* SAT: '+sat+'<br>* FALLBACK: LATEST JPG');tsEl.style.display='block';tsEl.textContent='LATEST STATIC — '+new Date().toISOString().split('T')[1].split('.')[0]+' UTC';linkRow.style.display='block';linkRow.innerHTML='<a href="'+currentImgUrl+'" target="_blank">OPEN FULL RES ↗</a> &nbsp;|&nbsp; <a href="'+sUrl+'" target="_blank">STAR VIEWER ↗</a>';document.getElementById('manualRefreshBtn').style.display='block';document.getElementById('autoRefreshRow').style.display='flex';startAutoRefresh()}
+function manualRefresh(){if(!lastSat)return;syncImage()}
+function startAutoRefresh(){if(autoRefreshTimer)clearInterval(autoRefreshTimer);if(!document.getElementById('autoRefreshChk').checked)return;var interval=lastPath==='FD'?600:300;autoRefreshCountdown=interval;document.getElementById('autoRefreshCd').textContent='('+Math.floor(interval/60)+':'+String(interval%60).padStart(2,'0')+')';autoRefreshTimer=setInterval(function(){autoRefreshCountdown--;if(autoRefreshCountdown<=0){syncImage()}else document.getElementById('autoRefreshCd').textContent='('+Math.floor(autoRefreshCountdown/60)+':'+String(autoRefreshCountdown%60).padStart(2,'0')+')'}, 1000)}
+function toggleAutoRefresh(){if(document.getElementById('autoRefreshChk').checked){if(currentImgUrl)startAutoRefresh()}else{if(autoRefreshTimer)clearInterval(autoRefreshTimer);document.getElementById('autoRefreshCd').textContent='(OFF)'}}
+function resetLoop(){if(animTimer){clearInterval(animTimer);animTimer=null}animFrames=[];animIdx=0;document.getElementById('sat-img').src='';document.getElementById('sat-img').style.display='none';document.getElementById('sat-img').style.opacity='1';currentImgUrl='';if(autoRefreshTimer)clearInterval(autoRefreshTimer);document.getElementById('img-ph').style.display='block';document.getElementById('img-ph').style.opacity='.2';document.getElementById('img-ph').innerHTML='<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin:0 auto 12px"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><div style="font-size:11px">AWAITING SECTOR AND BAND SELECTION</div>';document.getElementById('img-bar').style.display='none';document.getElementById('img-link-row').style.display='none';document.getElementById('img-timestamp').style.display='none';document.getElementById('img-refresh-badge').style.display='none';document.getElementById('manualRefreshBtn').style.display='none';document.getElementById('autoRefreshRow').style.display='none';document.getElementById('sectorSel').selectedIndex=0;document.getElementById('bandSel').selectedIndex=0;setStatus('#444','FEED OFFLINE // NO SIGNAL','—');setSys('* SYS: NOMINAL<br>* SRC: CDN.STAR.NESDIS.NOAA.GOV<br>* STATION: IDLE')}
+/* NWS GROUND — LOCATION SEARCH */
+var locSearchTimeout=null,selectedLat=null,selectedLon=null,selectedPlace='';
+function debounceLocSearch(){if(locSearchTimeout)clearTimeout(locSearchTimeout);var val=document.getElementById('locSearchIn').value.trim();if(val.length<2){document.getElementById('locResults').style.display='none';return}if(/^\d{5}$/.test(val)){document.getElementById('locResults').style.display='none';selectedLat=null;selectedLon=null;return}locSearchTimeout=setTimeout(function(){searchLocations(val)},350)}
+async function searchLocations(q){var results=document.getElementById('locResults');try{var r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&countrycodes=us&format=json&limit=6&addressdetails=1',{headers:{'Accept-Language':'en-US'}});if(!r.ok)return;var data=await r.json();if(!data.length){results.style.display='none';return}results.innerHTML=data.map(function(d){var ad=d.address||{},town=ad.city||ad.town||ad.village||ad.hamlet||'',state=ad.state||'',zip=ad.postcode||'',label=town?(town+(state?', '+state:'')):(d.display_name.split(',').slice(0,2).join(',')),safeName=d.display_name.split(',').slice(0,3).join(',').replace(/'/g,"\\'");return'<div class="loc-item" onclick="selectLoc('+d.lat+','+d.lon+",\\'"+safeName+"\\',\\'"+zip+"\\'"+')">' +label+'<small>'+(zip?'ZIP: '+zip+' — ':'')+parseFloat(d.lat).toFixed(2)+'°, '+parseFloat(d.lon).toFixed(2)+'°</small></div>'}).join('');results.style.display='block'}catch(e){results.style.display='none'}}
+function selectLoc(lat,lon,name,zip){selectedLat=lat;selectedLon=lon;selectedPlace=name;document.getElementById('locSearchIn').value=zip||name;document.getElementById('locResults').style.display='none';document.getElementById('nws-loc-text').textContent='→ '+name}
+document.addEventListener('click',function(e){if(!e.target.closest('.loc-search-wrap'))document.getElementById('locResults').style.display='none'});
+
+var nwsPinMesh=null,nwsPinTie=null,_pinLat=null,_pinLon=null;
+function placeNWSPin(lat,lon){
+  _pinLat=lat;_pinLon=lon;removeNWSPin();
+  if(!globeReady||!grp)return;
+  var lr=lat*Math.PI/180,lnr=lon*Math.PI/180,sr=1.022;
+  var x=sr*Math.cos(lnr)*Math.cos(lr),y=sr*Math.sin(lr),z=-sr*Math.sin(lnr)*Math.cos(lr);
+  var pg=new THREE.Group();
+  pg.add(new THREE.Mesh(new THREE.SphereGeometry(.016,8,8),new THREE.MeshBasicMaterial({color:0xff3333,transparent:true,opacity:.95})));
+  var ring=new THREE.Mesh(new THREE.RingGeometry(.020,.028,24),new THREE.MeshBasicMaterial({color:0xff3333,side:THREE.DoubleSide,transparent:true,opacity:.5}));
+  ring.lookAt(new THREE.Vector3(x*3,y*3,z*3));pg.add(ring);
+  pg.position.set(x,y,z);grp.add(pg);nwsPinMesh=pg;
+  var r2=1.15,tieL=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,y,z),new THREE.Vector3(x/sr*r2,y/sr*r2,z/sr*r2)]),new THREE.LineBasicMaterial({color:0xff3333,transparent:true,opacity:.5}));
+  grp.add(tieL);nwsPinTie=tieL;
+}
+function removeNWSPin(){
+  if(nwsPinMesh){if(grp)grp.remove(nwsPinMesh);nwsPinMesh=null;}
+  if(nwsPinTie){if(grp)grp.remove(nwsPinTie);nwsPinTie=null;}
+  _pinLat=null;_pinLon=null;
+}
+function flyToNWSPin(){if(!globeReady)initGlobe();switchTab('orbital');}
+
+/* ════════════════════════════════════════════════════════
+   WIREFRAME FOV CONE  (apex = satellite, base = Earth limb)
+   Matches reference image: meridian lines + concentric rings
+   ════════════════════════════════════════════════════════ */
+var _coneMesh=null,_coneRing=null;
+function showSatCone(satGrp,color){
+  hideSatCone();
+  if(!grp||!satGrp)return;
+  var satPos=satGrp.position.clone();
+  var satDist=satPos.length();
+  var satDir=satPos.clone().normalize();
+  /* half-angle of Earth limb from GEO altitude */
+  var halfAngle=Math.asin(1.0/satDist);
+  var coneH=satDist-1.0;
+  var baseR=Math.tan(halfAngle)*coneH;
+
+  /* local orthonormal frame: axis from apex toward Earth */
+  var axis=satDir.clone().negate();
+  var tmp=Math.abs(axis.x)<0.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0);
+  var u=new THREE.Vector3().crossVectors(axis,tmp).normalize();
+  var v=new THREE.Vector3().crossVectors(axis,u).normalize();
+
+  var apex=satPos.clone();
+  var coneCenter=satPos.clone().addScaledVector(axis,coneH);
+
+  var NM=24;  /* meridian lines */
+  var NR=8;   /* ring levels */
+  var RES=64; /* ring resolution */
+  var mat=new THREE.LineBasicMaterial({color:color,transparent:true,opacity:.4,depthWrite:false});
+  var coneGrp=new THREE.Group();
+
+  /* meridian lines: apex → each point on base ring */
+  for(var m=0;m<NM;m++){
+    var ang=m/NM*Math.PI*2;
+    var cu=Math.cos(ang),cv=Math.sin(ang);
+    var bPt=new THREE.Vector3(
+      coneCenter.x+baseR*(cu*u.x+cv*v.x),
+      coneCenter.y+baseR*(cu*u.y+cv*v.y),
+      coneCenter.z+baseR*(cu*u.z+cv*v.z)
+    );
+    coneGrp.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([apex.clone(),bPt]),mat));
+  }
+
+  /* concentric rings at evenly-spaced t levels along cone height */
+  for(var r=1;r<=NR;r++){
+    var t=r/NR;
+    var ringR=baseR*t;
+    var ringC=satPos.clone().addScaledVector(axis,coneH*t);
+    var rPts=[];
+    for(var i=0;i<=RES;i++){
+      var a=i/RES*Math.PI*2;
+      var ca=Math.cos(a),sa=Math.sin(a);
+      rPts.push(new THREE.Vector3(
+        ringC.x+ringR*(ca*u.x+sa*v.x),
+        ringC.y+ringR*(ca*u.y+sa*v.y),
+        ringC.z+ringR*(ca*u.z+sa*v.z)
+      ));
+    }
+    coneGrp.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(rPts),mat));
+  }
+
+  grp.add(coneGrp);
+  _coneMesh=coneGrp;
+
+  /* bold coverage circle on Earth surface */
+  var surfMat=new THREE.LineBasicMaterial({color:color,transparent:true,opacity:.6,depthWrite:false});
+  var surfPts=[];
+  for(var i=0;i<=96;i++){
+    var a=i/96*Math.PI*2;
+    var ca=Math.cos(a),sa=Math.sin(a);
+    surfPts.push(new THREE.Vector3(
+      coneCenter.x+baseR*(ca*u.x+sa*v.x),
+      coneCenter.y+baseR*(ca*u.y+sa*v.y),
+      coneCenter.z+baseR*(ca*u.z+sa*v.z)
+    ));
+  }
+  _coneRing=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(surfPts),surfMat);
+  grp.add(_coneRing);
+}
+function hideSatCone(){
+  if(_coneMesh){if(grp)grp.remove(_coneMesh);_coneMesh=null;}
+  if(_coneRing){if(grp)grp.remove(_coneRing);_coneRing=null;}
+}
+
+/* units */
+var _nwsUnits='imperial';var _lastCurPeriod=null;
+function setNWSUnits(u){_nwsUnits=u;if(_lastCurPeriod)renderCurrentConditions(_lastCurPeriod);if(nwsActive&&_lastGridData!==null)renderNWSGraphs(_lastGridData,_lastHourly,_lastObsPress,_lastObsStation);}
+function f2c(f){return Math.round((f-32)*5/9*10)/10;}
+function mph2kph(v){return Math.round(v*1.60934*10)/10;}
+function windConvStr(s){if(_nwsUnits==='imperial')return s;return(s||'').replace(/(\d+\.?\d*)\s*mph/gi,function(m,n){return mph2kph(parseFloat(n))+' km/h';});}
+function renderCurrentConditions(p){
+  _lastCurPeriod=p;var imp=(_nwsUnits==='imperial'),temp=imp?p.temperature:f2c(p.temperature),tu=imp?'°F':'°C',hum=p.relativeHumidity?p.relativeHumidity.value+'%':'—';
+  var el=document.getElementById('nws-current-block');if(!el)return;
+  el.innerHTML='<div class="nws-current fade-up" style="animation-delay:150ms"><div><div class="nws-current-short">'+p.name+' — '+p.shortForecast+'</div><div class="nws-current-temp">'+temp+tu+'</div><div class="nws-current-detail" style="margin-top:6px">'+(p.detailedForecast||'')+'</div><div class="nws-current-detail">WIND: '+windConvStr(p.windSpeed||'—')+' '+(p.windDirection||'')+' | HUMIDITY: '+hum+'</div></div></div>';
+}
+function fmtHour(ts){var d=new Date(ts),h=d.getHours(),ampm=h>=12?'PM':'AM';h=h%12||12;return h+ampm;}
+function fmtDay(ts){return['SUN','MON','TUE','WED','THU','FRI','SAT'][new Date(ts).getDay()];}
+function makeSparkSVG(data,color){
+  var vals=[],times=[];
+  if(data.length&&typeof data[0]==='object'&&'t' in data[0]){data.forEach(function(d){if(d.v!==null&&!isNaN(d.v)){vals.push(d.v);times.push(d.t);}});}
+  else{vals=data.filter(function(v){return v!==null&&!isNaN(v);});}
+  if(vals.length<2)return'<svg class="nws-graph-svg"></svg>';
+  var W=300,H=80,PT=18,PB=14,PX=8,n=vals.length,mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals);if(mx===mn)mx=mn+1;
+  function px(i){return(PX+i/(n-1)*(W-2*PX)).toFixed(1);}
+  function py(vv){return(PT+(1-(vv-mn)/(mx-mn))*(H-PT-PB)).toFixed(1);}
+  var area='M'+px(0)+','+(H-PB)+' '+vals.map(function(vv,i){return'L'+px(i)+','+py(vv);}).join(' ')+' L'+px(n-1)+','+(H-PB)+' Z';
+  var line=vals.map(function(vv,i){return(i?'L':'M')+px(i)+','+py(vv);}).join(' ');
+  var step=Math.max(1,Math.round(n/6)),vL='',tL='',lastDay='';
+  for(var i=0;i<n;i+=step){
+    vL+='<text x="'+px(i)+'" y="'+(parseFloat(py(vals[i]))-3)+'" text-anchor="middle" font-size="7.5" fill="'+color+'" opacity=".75">'+Math.round(vals[i])+'</text>';
+    if(times.length){var day=fmtDay(times[i]),hr=fmtHour(times[i]),lbl=(day!==lastDay?day+' ':'')+hr;lastDay=day;tL+='<text x="'+px(i)+'" y="'+(H-1)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".38">'+lbl+'</text><line x1="'+px(i)+'" y1="'+(H-PB)+'" x2="'+px(i)+'" y2="'+(H-PB+3)+'" stroke="'+color+'" stroke-width=".6" opacity=".25"/>';}
+  }
+  var mini=vals.indexOf(Math.min.apply(null,vals)),maxi=vals.indexOf(Math.max.apply(null,vals));
+  var mmL='<text x="'+px(mini)+'" y="'+(parseFloat(py(mn))+12)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".4">▼'+Math.round(mn)+'</text><text x="'+px(maxi)+'" y="'+(parseFloat(py(mx))-3)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".4">▲'+Math.round(mx)+'</text>';
+  return'<svg class="nws-graph-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><path d="'+area+'" fill="'+color+'" opacity=".09"/><path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="1.5" opacity=".8"/>'+vL+tL+mmL+'</svg>';
+}
+function makePressureSVG(data,color,nowTs,pu){
+  /* Filter nulls */
+  var pts=data.filter(function(d){return d.v!==null&&!isNaN(d.v);});
+  if(pts.length<2)return'<svg class="nws-graph-svg"></svg>';
+  var W=600,H=100,PT=18,PB=16,PX=10,n=pts.length;
+  var mn=Math.min.apply(null,pts.map(function(d){return d.v;}));
+  var mx=Math.max.apply(null,pts.map(function(d){return d.v;}));
+  if(mx===mn)mx=mn+(mn*0.001||0.01);
+  var tMin=pts[0].t,tMax=pts[n-1].t,tRange=tMax-tMin||1;
+  function tx(t){return(PX+(t-tMin)/tRange*(W-2*PX)).toFixed(1);}
+  function py(v){return(PT+(1-(v-mn)/(mx-mn))*(H-PT-PB)).toFixed(1);}
+  /* Split into observed and forecast segments */
+  var obsPts=pts.filter(function(d){return d.obs;});
+  var fcPts=pts.filter(function(d){return!d.obs;});
+  /* Observed area fill */
+  var obsArea='',obsLine='',fcLine='',nowLine='',nowLabel='';
+  if(obsPts.length>=2){
+    obsArea='M'+tx(obsPts[0].t)+','+(H-PB)+' ';
+    obsArea+=obsPts.map(function(d){return'L'+tx(d.t)+','+py(d.v);}).join(' ');
+    obsArea+=' L'+tx(obsPts[obsPts.length-1].t)+','+(H-PB)+' Z';
+    obsLine=obsPts.map(function(d,i){return(i?'L':'M')+tx(d.t)+','+py(d.v);}).join(' ');
+  }
+  /* If we have both obs and fc, stitch a bridge segment at the boundary */
+  var bridgeLine='';
+  if(obsPts.length&&fcPts.length){
+    var lastObs=obsPts[obsPts.length-1],firstFc=fcPts[0];
+    bridgeLine='M'+tx(lastObs.t)+','+py(lastObs.v)+' L'+tx(firstFc.t)+','+py(firstFc.v);
+  }
+  if(fcPts.length>=2){
+    fcLine=fcPts.map(function(d,i){return(i?'L':'M')+tx(d.t)+','+py(d.v);}).join(' ');
+  }else if(fcPts.length===1&&obsPts.length){
+    fcLine='';/* handled by bridge */
+  }
+  /* NOW marker */
+  var nowX=null;
+  if(nowTs>=tMin&&nowTs<=tMax){nowX=parseFloat(tx(nowTs));}
+  else if(obsPts.length&&!fcPts.length){nowX=parseFloat(tx(obsPts[obsPts.length-1].t));}
+  /* Value labels at key points */
+  var step=Math.max(1,Math.round(n/8)),vL='',tL='',lastDay='';
+  for(var i=0;i<n;i+=step){
+    var d=pts[i];
+    vL+='<text x="'+tx(d.t)+'" y="'+(parseFloat(py(d.v))-3)+'" text-anchor="middle" font-size="7.5" fill="'+color+'" opacity="'+(d.obs?'.85':'.6')+'">'+d.v.toFixed(d.v>10?1:3)+'</text>';
+    var day=fmtDay(d.t),hr=fmtHour(d.t),lbl=(day!==lastDay?day+' ':'')+hr;lastDay=day;
+    tL+='<text x="'+tx(d.t)+'" y="'+(H-1)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".35">'+lbl+'</text>';
+    tL+='<line x1="'+tx(d.t)+'" y1="'+(H-PB)+'" x2="'+tx(d.t)+'" y2="'+(H-PB+3)+'" stroke="'+color+'" stroke-width=".6" opacity=".2"/>';
+  }
+  /* Min/max markers */
+  var vals=pts.map(function(d){return d.v;});
+  var mini=vals.indexOf(Math.min.apply(null,vals)),maxi=vals.indexOf(Math.max.apply(null,vals));
+  var mmL='<text x="'+tx(pts[mini].t)+'" y="'+(parseFloat(py(mn))+12)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".4">▼'+mn.toFixed(mn>10?1:3)+'</text>';
+  mmL+='<text x="'+tx(pts[maxi].t)+'" y="'+(parseFloat(py(mx))-3)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".4">▲'+mx.toFixed(mx>10?1:3)+'</text>';
+  /* Build SVG */
+  var svg='<svg class="nws-graph-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="height:100px">';
+  /* observed fill */
+  if(obsArea)svg+='<path d="'+obsArea+'" fill="'+color+'" opacity=".12"/>';
+  /* forecast shaded region */
+  if(nowX!==null){
+    var fcShadeX=nowX,fcShadeW=W-PX-fcShadeX;
+    svg+='<rect x="'+fcShadeX.toFixed(1)+'" y="'+PT+'" width="'+fcShadeW.toFixed(1)+'" height="'+(H-PT-PB)+'" fill="'+color+'" opacity=".04"/>';
+  }
+  /* observed solid line */
+  if(obsLine)svg+='<path d="'+obsLine+'" fill="none" stroke="'+color+'" stroke-width="1.8" opacity=".9"/>';
+  /* bridge */
+  if(bridgeLine)svg+='<path d="'+bridgeLine+'" fill="none" stroke="'+color+'" stroke-width="1" opacity=".4" stroke-dasharray="3,3"/>';
+  /* forecast dashed line */
+  if(fcLine)svg+='<path d="'+fcLine+'" fill="none" stroke="'+color+'" stroke-width="1.5" opacity=".6" stroke-dasharray="5,3"/>';
+  /* NOW marker line */
+  if(nowX!==null){
+    svg+='<line x1="'+nowX.toFixed(1)+'" y1="'+PT+'" x2="'+nowX.toFixed(1)+'" y2="'+(H-PB)+'" stroke="'+color+'" stroke-width="1" opacity=".5" stroke-dasharray="2,2"/>';
+    svg+='<text x="'+nowX.toFixed(1)+'" y="'+(PT-3)+'" text-anchor="middle" font-size="6" fill="'+color+'" opacity=".6">NOW</text>';
+  }
+  /* OBS / FCST segment labels */
+  if(obsPts.length&&nowX!==null){
+    var midObsX=(parseFloat(tx(obsPts[0].t))+nowX)/2;
+    svg+='<text x="'+midObsX.toFixed(1)+'" y="'+(PT+8)+'" text-anchor="middle" font-size="6" fill="'+color+'" opacity=".35">OBSERVED</text>';
+  }
+  if(fcPts.length&&nowX!==null){
+    var midFcX=(nowX+W-PX)/2;
+    svg+='<text x="'+midFcX.toFixed(1)+'" y="'+(PT+8)+'" text-anchor="middle" font-size="6" fill="'+color+'" opacity=".25">FORECAST</text>';
+  }
+  svg+=vL+tL+mmL+'</svg>';
+  return svg;
+}
+function makeBarSVG(data,color){
+  var vals=[],times=[];
+  if(data.length&&typeof data[0]==='object'&&'t' in data[0]){data.forEach(function(d){vals.push(d.v||0);times.push(d.t);});}
+  else{vals=(data||[]).filter(function(v){return v!==null&&!isNaN(v);});}
+  if(!vals.length)return'<svg class="nws-graph-bar"></svg>';
+  var W=300,H=60,PT=10,PB=14,PX=4,n=vals.length,mx=Math.max.apply(null,vals)||1,bw=Math.max(1.5,(W-2*PX)/n-1),bars='',tL='',step=Math.max(1,Math.round(n/7));
+  for(var i=0;i<n;i++){var x=PX+i*(W-2*PX)/n,bh=Math.max(1,(vals[i]/mx)*(H-PT-PB)),y=H-PB-bh;bars+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+bh.toFixed(1)+'" fill="'+color+'" opacity=".72" rx="1"/>';if(i%step===0&&vals[i]>0)bars+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y-2).toFixed(1)+'" text-anchor="middle" font-size="7" fill="'+color+'" opacity=".8">'+Math.round(vals[i])+'%</text>';}
+  if(times.length){for(var i=0;i<n;i+=step){var x=PX+i*(W-2*PX)/n;tL+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-1)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".35">'+fmtHour(times[i])+'</text>';}}
+  return'<svg class="nws-graph-bar" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+bars+tL+'</svg>';
+}
+function degToCardinal(d){if(d===null||d===undefined||isNaN(d))return'—';return['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d/22.5)%16];}
+function makeWindDirCards(data,spdData,wu){
+  if(!data||!data.length)return'';
+  var step=Math.max(1,Math.round(data.length/12)),cells='';
+  for(var i=0;i<data.length;i+=step){var d=typeof data[i]==='object'?data[i].v:data[i],t=typeof data[i]==='object'?data[i].t:null,s=spdData&&spdData[i]?(typeof spdData[i]==='object'?spdData[i].v:spdData[i]):null;cells+='<div class="nws-wd-cell">'+(t?'<div class="nws-wd-time">'+fmtHour(t)+'</div>':'')+'<div class="nws-wd-card">'+degToCardinal(d)+'</div><div class="nws-wd-deg">'+(d!==null?Math.round(d)+'°':'—')+'</div>'+(s!==null?'<div class="nws-wd-spd">'+Math.round(s)+' '+wu+'</div>':'')+'</div>';}
+  return'<div style="margin-bottom:10px"><div class="nws-graph-lbl">WIND DIRECTION / SPEED</div><div class="nws-winddir-wrap">'+cells+'</div></div>';
+}
+function parseGridTS(prop,lim){
+  if(!prop||!prop.values)return[];var now=Date.now(),out=[];
+  prop.values.forEach(function(v){try{var parts=v.validTime.split('/'),t=new Date(parts[0]).getTime(),hrs=1;var hm=(parts[1]||'PT1H').match(/(\d+)H/);if(hm)hrs=parseInt(hm[1]);for(var h=0;h<hrs;h++){var ts=t+h*3600000;if(ts>=now&&out.length<(lim||48))out.push({t:ts,v:v.value});}}catch(e){}});
+  return out.slice(0,lim||48);
+}
+var _lastGridData=null,_lastHourly=null,_lastObsPress=null,_lastObsStation=null;
+function renderNWSGraphs(gridData,hourly,obsPress,obsStationId){
+  _lastGridData=gridData;_lastHourly=hourly;_lastObsPress=obsPress||[];_lastObsStation=obsStationId||null;
+  var imp=(_nwsUnits==='imperial'),gp=gridData?gridData.properties:null,H=48;
+  function c2f_r(c){return Math.round((c*9/5+32)*10)/10;}function ms2mph(vv){return Math.round(vv*2.23694*10)/10;}function ms2kph(vv){return Math.round(vv*3.6*10)/10;}function pa2inhg(vv){return Math.round(vv*0.0002953*1000)/1000;}function pa2hpa(vv){return Math.round(vv/100*10)/10;}
+  var tu=imp?'°F':'°C',wu=imp?'mph':'km/h',pu=imp?'inHg':'hPa',tempD=[],dewD=[],humD=[],cloudD=[],popD=[],wSpdD=[],wDirD=[],fcPressD=[];
+  if(gp){parseGridTS(gp.temperature,H).forEach(function(d){tempD.push({t:d.t,v:d.v!==null?(imp?c2f_r(d.v):d.v):null});});parseGridTS(gp.dewpoint,H).forEach(function(d){dewD.push({t:d.t,v:d.v!==null?(imp?c2f_r(d.v):d.v):null});});parseGridTS(gp.relativeHumidity,H).forEach(function(d){humD.push({t:d.t,v:d.v});});parseGridTS(gp.skyCover,H).forEach(function(d){cloudD.push({t:d.t,v:d.v});});parseGridTS(gp.probabilityOfPrecipitation,H).forEach(function(d){popD.push({t:d.t,v:d.v||0});});parseGridTS(gp.windSpeed,H).forEach(function(d){wSpdD.push({t:d.t,v:d.v!==null?(imp?ms2mph(d.v):ms2kph(d.v)):null});});parseGridTS(gp.windDirection,H).forEach(function(d){wDirD.push({t:d.t,v:d.v});});var pp=gp.barometricPressure||gp.pressure||gp.pressureStationPressure||null;if(pp)parseGridTS(pp,H).forEach(function(d){fcPressD.push({t:d.t,v:d.v!==null?(imp?pa2inhg(d.v):pa2hpa(d.v)):null});});}
+  if(!tempD.length&&hourly&&hourly.length){hourly.slice(0,H).forEach(function(h){var t=new Date(h.startTime).getTime();tempD.push({t:t,v:imp?h.temperature:f2c(h.temperature)});if(h.relativeHumidity)humD.push({t:t,v:h.relativeHumidity.value});if(h.probabilityOfPrecipitation)popD.push({t:t,v:h.probabilityOfPrecipitation.value||0});var ws=h.windSpeed?parseFloat(h.windSpeed):null;if(ws!==null&&!isNaN(ws))wSpdD.push({t:t,v:imp?ws:mph2kph(ws)});});}
+
+  /* Build merged observed + forecast pressure series */
+  var obsPressConverted=(_lastObsPress||[]).filter(function(d){return d.v!==null;}).map(function(d){return{t:d.t,v:imp?pa2inhg(d.v):pa2hpa(d.v),obs:true};});
+  var mergedPressD=obsPressConverted.concat(fcPressD.map(function(d){return{t:d.t,v:d.v,obs:false};}));
+  mergedPressD.sort(function(a,b){return a.t-b.t;});
+  /* deduplicate timestamps close to boundary (within 30 min) */
+  var nowTs=Date.now(),filtMerged=[];
+  mergedPressD.forEach(function(d){if(!filtMerged.length||Math.abs(d.t-filtMerged[filtMerged.length-1].t)>1800000||d.obs!==filtMerged[filtMerged.length-1].obs)filtMerged.push(d);});
+  mergedPressD=filtMerged;
+
+  var Y='#ffb400',C='#00cfff',G='#4ade80',W2='#c4b5fd',O='#fb923c',R='#f87171';
+  var o='<div class="nws-graph-block"><div class="nws-section-hd fade-up" style="animation-delay:280ms">48-HR GRAPHICAL FORECAST <span style="opacity:.35;font-size:8px">— '+_nwsUnits.toUpperCase()+'</span></div>';
+  if(tempD.length){o+='<div class="nws-graph-row"><div class="nws-graph-item"><div class="nws-graph-lbl">TEMPERATURE ('+tu+')</div>'+makeSparkSVG(tempD,Y)+'</div>';if(dewD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl">DEW POINT ('+tu+')</div>'+makeSparkSVG(dewD,C)+'</div>';o+='</div>';}
+  if(humD.length||cloudD.length){o+='<div class="nws-graph-row">';if(humD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl">HUMIDITY (%)</div>'+makeSparkSVG(humD,G)+'</div>';if(cloudD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl">SKY COVER (%)</div>'+makeSparkSVG(cloudD,W2)+'</div>';o+='</div>';}
+  if(popD.length){o+='<div class="nws-graph-row">';o+='<div class="nws-graph-item"><div class="nws-graph-lbl-sm">PROB. OF PRECIP. (%)</div>'+makeSparkSVG(popD,C)+'</div>';if(wSpdD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl-sm">WIND SPEED ('+wu+')</div>'+makeSparkSVG(wSpdD,O)+'</div>';o+='</div>';}
+  if(wDirD.length)o+=makeWindDirCards(wDirD,wSpdD,wu);
+
+  /* Pressure graph — always present */
+  o+='<div class="nws-graph-row"><div class="nws-graph-item nws-graph-item--wide">';
+  if(mergedPressD.length>=2){
+    var srcLabel=(_lastObsStation?'OBS: '+_lastObsStation+' — ':'')+(fcPressD.length?'FCST: GRID '+(_lastGridData&&_lastGridData.properties?(_lastGridData.properties.gridId||''):''):'OBS ONLY');
+    o+='<div class="nws-graph-lbl">BAROMETRIC PRESSURE ('+pu+') <span style="opacity:.35;font-size:7px">'+srcLabel+'</span></div>';
+    o+=makePressureSVG(mergedPressD,R,nowTs,pu);
+  }else if(obsPressConverted.length>=2){
+    o+='<div class="nws-graph-lbl">BAROMETRIC PRESSURE ('+pu+') <span style="opacity:.35;font-size:7px">OBS: '+(_lastObsStation||'STATION')+'</span></div>';
+    o+=makePressureSVG(obsPressConverted,R,nowTs,pu);
+  }else{
+    o+='<div class="nws-graph-lbl">BAROMETRIC PRESSURE</div><div style="font-size:9px;opacity:.3;padding:10px 0">NOT AVAILABLE — NO GRID OR STATION DATA</div>';
+  }
+  o+='</div></div>';
+
+  o+='</div>';var gb=document.getElementById('nws-graph-section');if(gb)gb.innerHTML=o;return o;
+}
+
+async function acquireNWS(){var input=document.getElementById('locSearchIn').value.trim();if(!input){alert('ENTER A LOCATION');return}var content=document.getElementById('nws-content'),lat,lon,place;setStatus('#ffb400','NWS GROUND // ACQUIRING — '+input,'LOADING');setSys('* STATUS: ACQUIRING<br>* INPUT: '+input+'<br>* SRC: API.WEATHER.GOV');content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">CONNECTING...</div></div>';try{if(selectedLat&&selectedLon&&!/^\d{5}$/.test(input)){lat=parseFloat(selectedLat).toFixed(4);lon=parseFloat(selectedLon).toFixed(4);place=selectedPlace}else if(/^\d{5}$/.test(input)){content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">RESOLVING ZIP '+input+'...</div></div>';var geoR=await fetch('https://nominatim.openstreetmap.org/search?postalcode='+input+'&country=US&format=json&limit=1&addressdetails=1',{headers:{'Accept-Language':'en-US'}});if(!geoR.ok)throw new Error('GEOCODER UNREACHABLE');var geoJ=await geoR.json();if(!geoJ.length)throw new Error('ZIP '+input+' NOT FOUND');lat=parseFloat(geoJ[0].lat).toFixed(4);lon=parseFloat(geoJ[0].lon).toFixed(4);var ad=geoJ[0].address||{};place=(ad.city||ad.town||ad.village||'')+(ad.state?', '+ad.state:'');if(!place)place=geoJ[0].display_name.split(',').slice(0,3).join(',')}else{content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">SEARCHING "'+input+'"...</div></div>';var geoR=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(input)+'&countrycodes=us&format=json&limit=1&addressdetails=1',{headers:{'Accept-Language':'en-US'}});if(!geoR.ok)throw new Error('GEOCODER UNREACHABLE');var geoJ=await geoR.json();if(!geoJ.length)throw new Error('"'+input+'" NOT FOUND — TRY A ZIP CODE');lat=parseFloat(geoJ[0].lat).toFixed(4);lon=parseFloat(geoJ[0].lon).toFixed(4);var ad=geoJ[0].address||{};place=(ad.city||ad.town||ad.village||'')+(ad.state?', '+ad.state:'');if(!place)place=geoJ[0].display_name.split(',').slice(0,3).join(',')}content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">CONNECTING TO NWS GRID — '+lat+'°, '+lon+'°...</div></div>';var ptR=await fetch('https://api.weather.gov/points/'+lat+','+lon);if(!ptR.ok)throw new Error('NWS POINT LOOKUP FAILED — LOCATION MAY BE OUTSIDE FORECAST COVERAGE');var ptJ=await ptR.json(),pr=ptJ.properties;content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">DOWNLOADING FORECAST FROM '+pr.gridId+'...</div></div>';var results=await Promise.all([fetch(pr.forecast),fetch(pr.forecastHourly),fetch('https://api.weather.gov/alerts/active?point='+lat+','+lon),fetch('https://api.weather.gov/gridpoints/'+pr.gridId+'/'+pr.gridX+','+pr.gridY),fetch(pr.observationStations+'?limit=1')]);if(!results[0].ok)throw new Error('FORECAST DATA UNAVAILABLE');var jsons=await Promise.all([results[0].json(),results[1].ok?results[1].json():null,results[2].ok?results[2].json():null,results[3].ok?results[3].json():null,results[4].ok?results[4].json():null]);var periods=jsons[0].properties.periods,hourly=jsons[1]?jsons[1].properties.periods.slice(0,48):[],alerts=jsons[2]?jsons[2].features:[],gridData=jsons[3]||null,obsStationId=jsons[4]&&jsons[4].features&&jsons[4].features.length?jsons[4].features[0].properties.stationIdentifier:null;var obsPress=[];if(obsStationId){try{var obR=await fetch('https://api.weather.gov/stations/'+obsStationId+'/observations?limit=48');if(obR.ok){var obJ=await obR.json();if(obJ.features){obJ.features.forEach(function(f){var p=f.properties;if(p&&p.barometricPressure&&p.barometricPressure.value!==null&&p.timestamp){obsPress.push({t:new Date(p.timestamp).getTime(),v:p.barometricPressure.value});}});obsPress.sort(function(a,b){return a.t-b.t;});}}}catch(e){}}var updated=new Date(jsons[0].properties.updated).toUTCString().slice(0,25),dc=pr.city||place.split(',')[0]||'',ds=pr.state||'';nwsActive=true;if(typeof placeNWSPin==='function')placeNWSPin(parseFloat(lat),parseFloat(lon));setStatus('#22c55e','NWS GROUND // '+dc+', '+ds+' — ACTIVE','GRID: '+pr.gridId+'('+pr.gridX+','+pr.gridY+')');setSys('* STATUS: ACTIVE FEED<br>* LOC: '+dc+', '+ds+'<br>* GRID: '+pr.gridId+' '+pr.gridX+','+pr.gridY+'<br>* RADAR: '+(pr.radarStation||'—')+'<br>* OBS STN: '+(obsStationId||'—'));document.getElementById('nws-loc-text').innerHTML='<span style="color:var(--y)">● '+dc+', '+ds+' — '+lat+'°, '+lon+'°</span>';document.getElementById('nws-globe-btn').style.display='block';var cur=periods[0],alertsHtml='';if(alerts.length>0)alertsHtml=alerts.map(function(a){return'<div class="nws-alerts fade-up">⚠ <b>'+(a.properties.headline||a.properties.event)+'</b><br><span style="opacity:.7">'+(a.properties.description||'').substring(0,200)+(a.properties.description&&a.properties.description.length>200?'...':'')+'</span><br><span style="font-size:9px;opacity:.4">EXPIRES: '+new Date(a.properties.expires).toUTCString().slice(0,25)+'</span></div>'}).join('');var imp0=(_nwsUnits==='imperial');var hrHtml=hourly.map(function(h,i){var t=new Date(h.startTime),hStr=t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:true});var ht=imp0?h.temperature:f2c(h.temperature);return'<div class="nws-hr fade-up" style="animation-delay:'+i*30+'ms"><div class="nws-hr-time">'+hStr+'</div><div class="nws-hr-temp">'+ht+(imp0?'°F':'°C')+'</div><div class="nws-hr-wind">'+windConvStr(h.windSpeed||'')+' '+(h.windDirection||'')+'</div><div class="nws-hr-short">'+(h.shortForecast||'').substring(0,18)+'</div></div>'}).join('');var fcHtml=periods.map(function(p,i){var pt=imp0?p.temperature:f2c(p.temperature);return'<div class="nws-card fade-up" style="animation-delay:'+i*50+'ms"><div class="nws-card-name">'+p.name+'</div><div class="nws-card-temp">'+pt+(imp0?'°F':'°C')+'</div><div class="nws-card-wind">'+windConvStr(p.windSpeed||'')+' '+(p.windDirection||'')+'</div><div class="nws-card-short">'+(p.shortForecast||'')+'</div></div>'}).join('');content.innerHTML='<div class="nws-hdr fade-up">'+dc+', '+ds+'</div><div class="nws-sub fade-up" style="animation-delay:50ms">GRID: '+pr.gridId+' ('+pr.gridX+','+pr.gridY+') | RADAR: '+(pr.radarStation||'—')+' | TZ: '+(pr.timeZone||'—')+' | UPDATED: '+updated+' UTC</div>'+alertsHtml+'<div class="nws-section-hd fade-up" style="animation-delay:100ms">CURRENT CONDITIONS</div><div id="nws-current-block"></div>'+(hourly.length?'<div class="nws-section-hd fade-up" style="animation-delay:200ms">48-HOUR OUTLOOK</div><div class="nws-hourly">'+hrHtml+'</div>':'')+'<div class="nws-section-hd fade-up" style="animation-delay:250ms">7-DAY FORECAST</div><div class="nws-grid">'+fcHtml+'</div><div id="nws-graph-section"></div><div class="nws-ext-link fade-up">GRAPHICAL: <a href="https://forecast.weather.gov/MapClick.php?lat='+lat+'&lon='+lon+'&FcstType=graphical" target="_blank">NWS CHART ↗</a> &nbsp;|&nbsp; <a href="https://forecast.weather.gov/MapClick.php?lat='+lat+'&lon='+lon+'" target="_blank">FORECAST ↗</a> &nbsp;|&nbsp; <a href="https://radar.weather.gov/" target="_blank">RADAR ↗</a> &nbsp;|&nbsp; <a href="https://www.nhc.noaa.gov" target="_blank">NHC ↗</a></div>';renderCurrentConditions(cur);renderNWSGraphs(gridData,hourly,obsPress,obsStationId);document.getElementById('nwsRefreshBtn').style.display='block';document.getElementById('nwsAutoRow').style.display='flex';startNWSAuto()}catch(err){nwsActive=false;setStatus('#ff4444','NWS GROUND // ERROR','—');setSys('* STATUS: ERROR<br>* ERR: '+err.message.substring(0,40));content.innerHTML='<div class="nws-placeholder" style="height:300px"><div style="text-align:center;padding:30px"><div style="color:#ff6644;font-size:11px;margin-bottom:8px">ACQUISITION FAILURE</div><div style="font-size:10px;opacity:.5;margin-bottom:16px">'+err.message+'</div><div style="font-size:10px;opacity:.4">TRY A DIFFERENT LOCATION OR ZIP CODE.</div></div></div>'}}
+function clearNWS(){if(nwsAutoTimer)clearInterval(nwsAutoTimer);if(typeof removeNWSPin==='function')removeNWSPin();document.getElementById('locSearchIn').value='';document.getElementById('locResults').style.display='none';document.getElementById('nws-loc-text').textContent='';document.getElementById('nws-globe-btn').style.display='none';selectedLat=null;selectedLon=null;selectedPlace='';nwsActive=false;document.getElementById('nwsAutoRow').style.display='none';document.getElementById('nwsRefreshBtn').style.display='none';document.getElementById('nws-content').innerHTML='<div class="nws-placeholder" style="height:300px"><div style="text-align:center;opacity:.2"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin:0 auto 12px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg><div style="font-size:11px">SEARCH FOR A U.S. LOCATION TO ACQUIRE NWS FORECAST DATA</div></div></div>';setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: IDLE')}
+/* NWS AUTO-REFRESH */
+var nwsAutoTimer=null,nwsAutoCountdown=0,NWS_REFRESH_SEC=300;
+function startNWSAuto(){if(nwsAutoTimer)clearInterval(nwsAutoTimer);if(!document.getElementById('nwsAutoChk').checked)return;nwsAutoCountdown=NWS_REFRESH_SEC;document.getElementById('nwsAutoCd').textContent='('+Math.floor(NWS_REFRESH_SEC/60)+':'+String(NWS_REFRESH_SEC%60).padStart(2,'0')+')';nwsAutoTimer=setInterval(function(){nwsAutoCountdown--;if(nwsAutoCountdown<=0){acquireNWS()}else document.getElementById('nwsAutoCd').textContent='('+Math.floor(nwsAutoCountdown/60)+':'+String(nwsAutoCountdown%60).padStart(2,'0')+')'}, 1000)}
+function toggleNWSAuto(){if(document.getElementById('nwsAutoChk').checked){if(nwsActive)startNWSAuto()}else{if(nwsAutoTimer)clearInterval(nwsAutoTimer);document.getElementById('nwsAutoCd').textContent='(OFF)'}}
+function nwsManualRefresh(){if(!nwsActive)return;acquireNWS()}
+</script>
+</body>
+</html>
