@@ -1,6 +1,6 @@
 const CACHE = 'goes-star-v1';
 const ASSETS = [
-  './Weather-Station-Mobile.html',
+  './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'

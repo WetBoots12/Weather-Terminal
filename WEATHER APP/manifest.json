@@ -2,7 +2,7 @@
   "name": "GOES-STAR Command",
   "short_name": "GOES-STAR",
   "description": "Real-time GOES satellite imagery and NWS weather forecasts",
-  "start_url": "./Weather-Station-Mobile.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#ffb400",
