@@ -410,7 +410,7 @@ if('serviceWorker' in navigator){
     <div id="view-radar" class="view" style="background:#000;position:relative">
       <div id="radar-map" style="width:100%;height:100%"></div>
       <div id="radar-ph" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.2;pointer-events:none"><div style="text-align:center;font-size:11px">NO LOCATION — USE NWS GROUND TAB</div></div>
-      <div id="radar-ts" style="position:absolute;top:8px;right:8px;font-size:9px;background:rgba(0,0,0,.7);padding:3px 8px;display:none"></div>
+      <div id="radar-ts" style="position:absolute;top:8px;right:8px;font-size:9px;background:rgba(0,0,0,.7);padding:3px 8px;display:none;z-index:1000"></div>
     </div>
   </div>
 </div>
@@ -676,7 +676,7 @@ function toggleNWSCard(el){el.classList.toggle('expanded');}
 
 /* ═══════════════════════ RADAR TAB ═══════════════════════ */
 var radarMap=null,radarReady=false,_radarLat=null,_radarLon=null,_radarStation=null;
-var _rvFrames=[],_rvIdx=0,_rvTimer=null,_rvPaused=false,_rvRefreshTimer=null;
+var _rvFrames=[],_rvLayers=[],_rvIdx=0,_rvTimer=null,_rvPaused=false,_rvRefreshTimer=null;
 function initRadarMap(){
   radarReady=true;
   var container=document.getElementById('radar-map');
@@ -700,18 +700,24 @@ function _doRadarLoad(){
     _rvFrames=(data.radar&&data.radar.past?data.radar.past:[]).concat(data.radar&&data.radar.nowcast?data.radar.nowcast:[]);
     if(!_rvFrames.length)return;
     if(_rvTimer)clearInterval(_rvTimer);
-    if(window._rvLayer){radarMap.removeLayer(window._rvLayer);window._rvLayer=null;}
+    /* Remove old pre-loaded layers */
+    _rvLayers.forEach(function(l){radarMap.removeLayer(l);});
+    _rvLayers=[];
+    /* Pre-load all frames as tile layers at opacity 0 so tiles are cached in browser */
+    _rvFrames.forEach(function(f){
+      var l=L.tileLayer('https://tilecache.rainviewer.com'+f.path+'/256/{z}/{x}/{y}/2/1_1.png',{tileSize:256,opacity:0,maxZoom:12,maxNativeZoom:12}).addTo(radarMap);
+      _rvLayers.push(l);
+    });
     _rvIdx=0;
     _showRVFrame(_rvIdx);
     _rvTimer=setInterval(function(){if(_rvPaused)return;_rvIdx=(_rvIdx+1)%_rvFrames.length;_showRVFrame(_rvIdx);},500);
   }).catch(function(){document.getElementById('radar-frame-info').textContent='RAINVIEWER UNAVAILABLE';});
 }
 function _showRVFrame(idx){
-  if(!_rvFrames.length||!radarMap)return;
-  if(window._rvLayer){radarMap.removeLayer(window._rvLayer);}
-  var f=_rvFrames[idx];
-  window._rvLayer=L.tileLayer('https://tilecache.rainviewer.com'+f.path+'/256/{z}/{x}/{y}/2/1_1.png',{tileSize:256,opacity:0.65,maxZoom:12,maxNativeZoom:12}).addTo(radarMap);
-  var d=new Date(f.time*1000),ts=d.toISOString().split('T')[1].slice(0,5)+' UTC';
+  if(!_rvFrames.length||!radarMap||!_rvLayers.length)return;
+  /* Switch visibility via opacity — no DOM create/destroy, eliminates flicker */
+  _rvLayers.forEach(function(l,i){l.setOpacity(i===idx?0.65:0);});
+  var f=_rvFrames[idx],d=new Date(f.time*1000),ts=d.toISOString().split('T')[1].slice(0,5)+' UTC';
   document.getElementById('radar-ts').style.display='block';
   document.getElementById('radar-ts').textContent='FRAME '+(idx+1)+'/'+_rvFrames.length+' — '+ts;
   document.getElementById('radar-frame-info').textContent='FRAME '+(idx+1)+'/'+_rvFrames.length+' — '+ts;
