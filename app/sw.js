@@ -1,4 +1,4 @@
-const CACHE = 'goes-star-v1';
+const CACHE = 'goes-star-v2';
 const ASSETS = [
   './index.html',
   './manifest.json',
