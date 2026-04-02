@@ -1,4 +1,4 @@
-const CACHE = 'goes-star-v2';
+const CACHE = 'goes-star-v3';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -21,15 +21,32 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  /* Network-first for NOAA/NWS API calls, cache-first for local assets */
   const url = e.request.url;
-  const isExternal = url.includes('noaa.gov') || url.includes('weather.gov') ||
-                     url.includes('nominatim') || url.includes('googleapis');
-  if (isExternal) {
-    e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503})));
-  } else {
+
+  /* Satellite imagery CDN — network-first, cache on success as fallback for hiccups */
+  if (url.includes('cdn.star.nesdis.noaa.gov')) {
     e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request))
+      fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then(cached => cached || new Response('', {status: 503})))
     );
+    return;
   }
+
+  /* Live API calls (NWS, Nominatim) — pure network, no caching */
+  if (url.includes('noaa.gov') || url.includes('weather.gov') ||
+      url.includes('nominatim') || url.includes('googleapis') ||
+      url.includes('rainviewer.com')) {
+    e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503})));
+    return;
+  }
+
+  /* Local app assets — cache-first */
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request))
+  );
 });
