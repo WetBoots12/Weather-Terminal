@@ -1,4 +1,4 @@
-const CACHE = 'goes-star-v3';
+const CACHE = 'goes-star-v4';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -26,7 +26,7 @@ self.addEventListener('fetch', e => {
   /* Satellite imagery CDN — network-first, cache on success as fallback for hiccups */
   if (url.includes('cdn.star.nesdis.noaa.gov')) {
     e.respondWith(
-      fetch(e.request).then(res => {
+      fetch(e.request, {cache: 'no-cache'}).then(res => {
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
