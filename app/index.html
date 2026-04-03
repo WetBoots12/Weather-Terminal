@@ -414,6 +414,18 @@ if('serviceWorker' in navigator){
       <div id="radar-map" style="width:100%;height:100%"></div>
       <div id="radar-ph" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.2;pointer-events:none"><div style="text-align:center;font-size:11px">NO LOCATION — USE NWS GROUND TAB</div></div>
       <div id="radar-ts" style="position:absolute;top:8px;right:8px;font-size:9px;background:rgba(0,0,0,.7);padding:3px 8px;display:none;z-index:1000"></div>
+      <div id="radar-ctrl" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:1001;display:flex;flex-direction:column;gap:5px;align-items:center">
+        <div style="display:flex;gap:2px;background:rgba(0,0,0,.9);border:1px solid rgba(255,180,0,.35);padding:3px">
+          <button id="rsc-national" onclick="setRadarScope('national')" style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 12px;cursor:pointer;letter-spacing:.05em;transition:all .15s">NATIONAL</button>
+          <button id="rsc-local"    onclick="setRadarScope('local')"    style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 12px;cursor:pointer;letter-spacing:.05em;transition:all .15s">LOCAL</button>
+        </div>
+        <div style="display:flex;gap:2px;background:rgba(0,0,0,.9);border:1px solid rgba(255,180,0,.35);padding:3px">
+          <button id="rprod-bref" onclick="setRadarProduct('bref_qcd')" style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 10px;cursor:pointer;letter-spacing:.05em;transition:all .15s">BASE REFL</button>
+          <button id="rprod-cref" onclick="setRadarProduct('cref_qcd')" style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 10px;cursor:pointer;letter-spacing:.05em;transition:all .15s">COMP REFL</button>
+          <button id="rprod-vel"  onclick="setRadarProduct('vel_qcd')"  style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 10px;cursor:pointer;letter-spacing:.05em;transition:all .15s">VELOCITY</button>
+          <button id="rprod-tops" onclick="setRadarProduct('tops_18')"  style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 10px;cursor:pointer;letter-spacing:.05em;transition:all .15s">ECHO TOPS</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -424,7 +436,7 @@ function setSys(h){document.getElementById('sys-status').innerHTML=h}
 function updateScanTimers(){var n=new Date(),s=n.getUTCMinutes()*60+n.getUTCSeconds(),fdR=600-s%600,coR=300-s%300,msR=60-s%60;function f(x){return Math.floor(x/60)+':'+String(x%60).padStart(2,'0')}document.querySelectorAll('.cd-fd').forEach(function(e){e.textContent=f(fdR)});document.querySelectorAll('.cd-co').forEach(function(e){e.textContent=f(coR)});document.querySelectorAll('.cd-ms').forEach(function(e){e.textContent=f(msR)});document.querySelectorAll('.sf-fd').forEach(function(e){e.style.width=(s%600/600*100)+'%'});document.querySelectorAll('.sf-co').forEach(function(e){e.style.width=(s%300/300*100)+'%'});document.querySelectorAll('.sf-ms').forEach(function(e){e.style.width=(s%60/60*100)+'%'})}
 setInterval(updateScanTimers,1000);updateScanTimers();
 var nwsActive=false;
-function switchTab(t,el){document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});el.classList.add('active');document.querySelectorAll('.panel').forEach(function(p){p.classList.add('hidden')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});document.getElementById('panel-'+t).classList.remove('hidden');document.getElementById('view-'+t).classList.add('active');if(t==='3d'){setStatus('#22c55e','3D ORBITAL VIEW // REAL-TIME POSITIONING','G19: 75.2°W | G18: 137.2°W');setSys('* SYS: NOMINAL<br>* VIEW: 3D ORBITAL<br>* POSITIONING: REAL-TIME');if(globeReady&&rdr){var _gw2=document.getElementById('globe-wrap');if(_gw2.clientWidth>0){rdr.setSize(_gw2.clientWidth,_gw2.clientHeight);cam.aspect=_gw2.clientWidth/_gw2.clientHeight;cam.updateProjectionMatrix();}}if(!globeReady)initGlobe()}else if(t==='loops'){if(currentImgUrl)setStatus('#22c55e','ACTIVE // '+lastSat+' — '+lastPath+' — '+lastBand,lastRes);else setStatus('#444','FEED OFFLINE // NO SIGNAL','—');setSys('* SYS: NOMINAL<br>* SRC: CDN.STAR.NESDIS.NOAA.GOV<br>* STATION: '+(currentImgUrl?'ACTIVE':'IDLE'))}else if(t==='nws'){if(!nwsActive)setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: '+(nwsActive?'ACTIVE':'IDLE'))}else if(t==='radar'){setStatus('#22c55e','RADAR // NEXRAD','—');setSys('* SYS: NOMINAL<br>* SRC: RAINVIEWER API<br>* STATION: '+(typeof _radarStation!=='undefined'&&_radarStation?_radarStation:'IDLE'));if(!radarReady)initRadarMap();if(typeof radarMap!=='undefined'&&radarMap)setTimeout(function(){radarMap.invalidateSize();},50);}document.getElementById('sys-status').parentElement.classList.remove('hidden')}
+function switchTab(t,el){document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});el.classList.add('active');document.querySelectorAll('.panel').forEach(function(p){p.classList.add('hidden')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});document.getElementById('panel-'+t).classList.remove('hidden');document.getElementById('view-'+t).classList.add('active');if(t==='3d'){setStatus('#22c55e','3D ORBITAL VIEW // REAL-TIME POSITIONING','G19: 75.2°W | G18: 137.2°W');setSys('* SYS: NOMINAL<br>* VIEW: 3D ORBITAL<br>* POSITIONING: REAL-TIME');if(globeReady&&rdr){var _gw2=document.getElementById('globe-wrap');if(_gw2.clientWidth>0){rdr.setSize(_gw2.clientWidth,_gw2.clientHeight);cam.aspect=_gw2.clientWidth/_gw2.clientHeight;cam.updateProjectionMatrix();}}if(!globeReady)initGlobe()}else if(t==='loops'){if(currentImgUrl)setStatus('#22c55e','ACTIVE // '+lastSat+' — '+lastPath+' — '+lastBand,lastRes);else setStatus('#444','FEED OFFLINE // NO SIGNAL','—');setSys('* SYS: NOMINAL<br>* SRC: CDN.STAR.NESDIS.NOAA.GOV<br>* STATION: '+(currentImgUrl?'ACTIVE':'IDLE'))}else if(t==='nws'){if(!nwsActive)setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: '+(nwsActive?'ACTIVE':'IDLE'))}else if(t==='radar'){setStatus('#22c55e','RADAR // NEXRAD','—');setSys('* SYS: NOMINAL<br>* SRC: '+(typeof _radarProduct!=='undefined'&&_radarProduct==='bref_qcd'?'RAINVIEWER API':'NWS RIDGE2')+'<br>* STATION: '+(typeof _radarStation!=='undefined'&&_radarStation?_radarStation:'IDLE'));if(!radarReady)initRadarMap();if(typeof radarMap!=='undefined'&&radarMap)setTimeout(function(){radarMap.invalidateSize();},50);_updateRadarProductUI();}document.getElementById('sys-status').parentElement.classList.remove('hidden')}
 
 /* 3D GLOBE */
 var globeReady=false,rdr,scn,cam,grp,eMesh,cMesh,g19m,g18m,dragging=false,pM={x:0,y:0};
@@ -686,24 +698,31 @@ function toggleNWSCard(el){el.classList.toggle('expanded');}
 /* ═══════════════════════ RADAR TAB ═══════════════════════ */
 var radarMap=null,radarReady=false,_radarLat=null,_radarLon=null,_radarStation=null;
 var _rvFrames=[],_rvLayers=[],_rvIdx=0,_rvTimer=null,_rvPaused=false,_rvRefreshTimer=null;
+var _radarProduct='bref_qcd',_radarScope='local',_ridgeLayer=null;
 function initRadarMap(){
   radarReady=true;
   var container=document.getElementById('radar-map');
   radarMap=L.map(container,{zoomControl:true,attributionControl:false}).setView([39.5,-98.35],4);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:12,subdomains:'abcd'}).addTo(radarMap);
-  if(_radarLat!==null)_doRadarLoad();
+  if(_radarLat===null){_radarScope='national';}
+  _updateRadarProductUI();
+  _doRadarLoad();
 }
 function updateRadarLocation(lat,lon,stationId){
+  var firstSet=(_radarLat===null);
   _radarLat=lat;_radarLon=lon;_radarStation=stationId||null;
   document.getElementById('radar-info').innerHTML=(stationId?'STATION: '+stationId+'<br>':'')+'LAT: '+lat.toFixed(2)+'° LON: '+lon.toFixed(2)+'°';
   document.getElementById('radar-ph').style.display='none';
-  if(radarReady&&radarMap){radarMap.setView([lat,lon],7);_doRadarLoad();}
+  if(firstSet){_radarScope='local';}
+  if(radarReady&&radarMap){_applyRadarProduct();}
   if(_rvRefreshTimer)clearInterval(_rvRefreshTimer);
-  _rvRefreshTimer=setInterval(function(){if(radarReady&&radarMap)_doRadarLoad();},600000);
+  _rvRefreshTimer=setInterval(function(){if(radarReady&&radarMap)_applyRadarProduct();},600000);
 }
 function _doRadarLoad(){
-  if(!radarMap)return;
-  radarMap.setView([_radarLat,_radarLon],7);
+  if(!radarMap||_radarProduct!=='bref_qcd')return;
+  if(_radarScope==='national'){radarMap.setView([39.5,-98.35],4);}
+  else if(_radarLat!==null){radarMap.setView([_radarLat,_radarLon],7);}
+  else return;
   fetch('https://api.rainviewer.com/public/weather-maps.json').then(function(r){return r.json();}).then(function(data){
     _rvPaused=false;
     _rvFrames=(data.radar&&data.radar.past?data.radar.past:[]).concat(data.radar&&data.radar.nowcast?data.radar.nowcast:[]);
@@ -733,6 +752,66 @@ function _showRVFrame(idx){
 }
 function radarPlay(){_rvPaused=false;if(!_rvTimer&&_rvFrames.length){_rvTimer=setInterval(function(){if(_rvPaused)return;_rvIdx=(_rvIdx+1)%_rvFrames.length;_showRVFrame(_rvIdx);},500);}}
 function radarPause(){_rvPaused=true;}
+function setRadarProduct(prod){
+  if(prod==='vel_qcd'&&_radarScope==='national'){_radarScope='local';}
+  _radarProduct=prod;
+  _applyRadarProduct();
+}
+function setRadarScope(scope){
+  if(scope==='national'&&_radarProduct==='vel_qcd'){_radarProduct='bref_qcd';}
+  _radarScope=scope;
+  _applyRadarProduct();
+}
+function _applyRadarProduct(){
+  if(!radarMap)return;
+  _updateRadarProductUI();
+  var isNat=(_radarScope==='national');
+  if(isNat){radarMap.setView([39.5,-98.35],4);}
+  else if(_radarLat!==null){radarMap.setView([_radarLat,_radarLon],7);}
+  if(_radarProduct==='bref_qcd'){
+    if(_ridgeLayer){radarMap.removeLayer(_ridgeLayer);_ridgeLayer=null;}
+    if(isNat||_radarLat!==null)_doRadarLoad();
+    return;
+  }
+  /* Switch to NWS RIDGE2 WMS */
+  if(_rvTimer){clearInterval(_rvTimer);_rvTimer=null;}
+  _rvLayers.forEach(function(l){radarMap.removeLayer(l);});_rvLayers=[];_rvFrames=[];
+  if(_ridgeLayer){radarMap.removeLayer(_ridgeLayer);_ridgeLayer=null;}
+  var st=(_radarStation||'').toLowerCase();
+  var useNat=isNat||!st;
+  var url,lyr;
+  if(useNat){url='https://opengeo.ncep.noaa.gov/geoserver/conus/conus_'+_radarProduct+'/ows';lyr='conus_'+_radarProduct;}
+  else{url='https://opengeo.ncep.noaa.gov/geoserver/'+st+'/'+st+'_'+_radarProduct+'/ows';lyr=st+'_'+_radarProduct;}
+  _ridgeLayer=L.tileLayer.wms(url,{layers:lyr,format:'image/png',transparent:true,version:'1.3.0',opacity:0.75,maxZoom:12}).addTo(radarMap);
+  var pLabels={bref_qcd:'BASE REFL',cref_qcd:'COMP REFL',vel_qcd:'VELOCITY',tops_18:'ECHO TOPS'};
+  var scopeLabel=useNat?'NATIONAL':(st.toUpperCase()||'LOCAL');
+  document.getElementById('radar-ts').style.display='block';
+  document.getElementById('radar-ts').textContent='NWS RIDGE2 // '+(pLabels[_radarProduct]||_radarProduct)+' // '+scopeLabel;
+  document.getElementById('radar-frame-info').textContent='NWS RIDGE2 — CURRENT FRAME — STATIC';
+}
+function _updateRadarProductUI(){
+  var pMap={bref:'bref_qcd',cref:'cref_qcd',vel:'vel_qcd',tops:'tops_18'};
+  Object.keys(pMap).forEach(function(k){
+    var el=document.getElementById('rprod-'+k);if(!el)return;
+    var active=pMap[k]===_radarProduct;
+    var disabled=(k==='vel'&&_radarScope==='national');
+    el.style.background=active?'rgba(255,180,0,.28)':'rgba(255,180,0,.05)';
+    el.style.color=active?'#ffb400':'rgba(255,180,0,.55)';
+    el.style.borderColor=active?'#ffb400':'rgba(255,180,0,.25)';
+    el.style.opacity=disabled?'0.3':'1';
+    el.style.pointerEvents=disabled?'none':'auto';
+  });
+  ['national','local'].forEach(function(s){
+    var el=document.getElementById('rsc-'+s);if(!el)return;
+    var active=s===_radarScope;
+    var noLoc=(s==='local'&&_radarLat===null);
+    el.style.background=active?'rgba(255,180,0,.28)':'rgba(255,180,0,.05)';
+    el.style.color=active?'#ffb400':'rgba(255,180,0,.55)';
+    el.style.borderColor=active?'#ffb400':'rgba(255,180,0,.25)';
+    el.style.opacity=noLoc?'0.35':'1';
+    el.style.pointerEvents=noLoc?'none':'auto';
+  });
+}
 
 /* ═══════════════════════ EXTRA SATELLITES ═══════════════════════ */
 var extraGEOSats=[],extraLEOSats=[],extraSatMeshes=[];
