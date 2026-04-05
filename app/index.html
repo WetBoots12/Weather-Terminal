@@ -785,7 +785,7 @@ var _NEXRAD=[
 ];
 var radarMap=null,radarReady=false,_radarLat=null,_radarLon=null,_radarStation=null;
 var _rvFrames=[],_rvLayers=[],_rvIdx=0,_rvTimer=null,_rvPaused=false,_rvRefreshTimer=null;
-var _radarProduct='bref_qcd',_radarScope='local',_ridgeLayer=null;
+var _radarProduct='bref_qcd',_radarScope='local',_ridgeLayer=null,_velRefreshTimer=null;
 var _nexradStations=_NEXRAD,_stationMarkers=null,_showStations=false;
 function initRadarMap(){
   radarReady=true;
@@ -874,8 +874,9 @@ function _applyRadarProduct(){
   if(_rvTimer){clearInterval(_rvTimer);_rvTimer=null;}
   _rvLayers.forEach(function(l){radarMap.removeLayer(l);});_rvLayers=[];_rvFrames=[];
   if(_ridgeLayer){radarMap.removeLayer(_ridgeLayer);_ridgeLayer=null;}
-  /* ── VELOCITY: per-station via NWS opengeo GeoServer (version 1.3.0 + EPSG:4326) ── */
+  /* ── VELOCITY: imageOverlay from radar.weather.gov/ridge/standard/base_velocity/ ── */
   if(_radarProduct==='vel_qcd'){
+    if(_velRefreshTimer){clearInterval(_velRefreshTimer);_velRefreshTimer=null;}
     if(!_radarStation){
       document.getElementById('radar-ts').style.display='block';
       document.getElementById('radar-ts').textContent='VELOCITY // LOCAL STATION REQUIRED';
@@ -884,16 +885,27 @@ function _applyRadarProduct(){
       else _renderStationMarkers();
       return;
     }
-    var stId=_radarStation.toLowerCase();
-    _ridgeLayer=L.tileLayer.wms(
-      'https://opengeo.ncep.noaa.gov/geoserver/'+stId+'/ows',
-      {layers:stId+'_vel_qcd',format:'image/png',transparent:true,
-       version:'1.3.0',crs:L.CRS.EPSG4326,opacity:0.75}
-    ).addTo(radarMap);
+    /* Find station lat/lon from hardcoded array */
+    var _vSt=_nexradStations.filter(function(s){return s[0]===_radarStation;})[0];
+    if(!_vSt){
+      document.getElementById('radar-frame-info').textContent='STATION '+_radarStation+' NOT FOUND — TRY ANOTHER';
+      return;
+    }
+    var _vLat=_vSt[2],_vLon=_vSt[3];
+    var _vBounds=_calcRadarBounds(_vLat,_vLon,230);
+    _ridgeLayer=L.imageOverlay(_getVelocityUrl(_radarStation,0),_vBounds,
+      {opacity:0.65,interactive:false}).addTo(radarMap);
     document.getElementById('radar-ts').style.display='block';
-    document.getElementById('radar-ts').textContent='NWS OPENGEO // SR_BVEL // '+_radarStation;
-    document.getElementById('radar-frame-info').textContent='* SRC: NWS OPENGEO // SR_BVEL\n* STATION: '+_radarStation;
+    document.getElementById('radar-ts').textContent='NWS RIDGE // BASE VELOCITY // '+_radarStation;
+    document.getElementById('radar-frame-info').textContent='SRC: radar.weather.gov/ridge — REFRESHES EVERY 5 MIN';
     if(_showStations)_renderStationMarkers();
+    /* Refresh tile every 5 minutes (cache-bust via frame rotation 0-9) */
+    var _vFrame=0;
+    _velRefreshTimer=setInterval(function(){
+      if(_radarProduct!=='vel_qcd'||!_ridgeLayer)return;
+      _vFrame=(_vFrame+1)%10;
+      _ridgeLayer.setUrl(_getVelocityUrl(_radarStation,_vFrame)+'?t='+Date.now());
+    },300000);
     return;
   }
   /* ── COMP REFL + ECHO TOPS: IEM NEXRAD composite tiles (CORS-friendly XYZ) ── */
