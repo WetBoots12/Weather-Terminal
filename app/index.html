@@ -787,8 +787,31 @@ var radarMap=null,radarReady=false,_radarLat=null,_radarLon=null,_radarStation=n
 var _rvFrames=[],_rvLayers=[],_rvIdx=0,_rvTimer=null,_rvPaused=false,_rvRefreshTimer=null;
 var _radarProduct='bref_qcd',_radarScope='local',_ridgeLayer=null,_velRefreshTimer=null;
 var _nexradStations=_NEXRAD,_stationMarkers=null,_showStations=false;
+/* ── Step 5: URL state helpers ── */
+function _syncRadarUrl(){
+  try{
+    var p=new URLSearchParams(window.location.search);
+    var state=_radarProduct;
+    if(_radarStation)state+=':'+_radarStation;
+    p.set('r',state);
+    window.history.replaceState({},'',window.location.pathname+'?'+p.toString());
+  }catch(e){}
+}
+function _restoreRadarUrl(){
+  try{
+    var p=new URLSearchParams(window.location.search);
+    var r=p.get('r');if(!r)return;
+    var parts=r.split(':');
+    var prod=parts[0],st=parts[1]||null;
+    var validProds={bref_qcd:1,cref_qcd:1,vel_qcd:1,eet:1};
+    if(!validProds[prod])return;
+    _radarProduct=prod;
+    if(st&&/^[A-Z]{4}$/.test(st)){_radarStation=st;}
+  }catch(e){}
+}
 function initRadarMap(){
   radarReady=true;
+  _restoreRadarUrl();
   var container=document.getElementById('radar-map');
   radarMap=L.map(container,{zoomControl:true,attributionControl:false}).setView([39.5,-98.35],4);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:12,subdomains:'abcd'}).addTo(radarMap);
@@ -850,6 +873,7 @@ function setRadarProduct(prod){
   /* Entering velocity with no station: ensure station overlay is visible */
   if(prod==='vel_qcd'&&!_radarStation&&!_showStations){toggleRadarStations();}
   _applyRadarProduct();
+  _syncRadarUrl();
 }
 function setRadarScope(scope){
   _radarScope=scope;
@@ -900,11 +924,28 @@ function _applyRadarProduct(){
     }
     var _vLat=_vSt[2],_vLon=_vSt[3];
     var _vBounds=_calcRadarBounds(_vLat,_vLon,230);
-    _ridgeLayer=L.imageOverlay(_getVelocityUrl(_radarStation,0),_vBounds,
-      {opacity:0.65,interactive:false}).addTo(radarMap);
+    var _vUrl=_getVelocityUrl(_radarStation,0);
+    document.getElementById('radar-frame-info').textContent='LOADING VELOCITY — '+_radarStation+'…';
+    /* Step 6: probe URL before adding overlay; retry once on failure */
+    var _vImg=new Image();
+    var _vStation=_radarStation; /* capture for async closure */
+    _vImg.onload=function(){
+      if(_radarProduct!=='vel_qcd'||_radarStation!==_vStation)return; /* stale */
+      _ridgeLayer=L.imageOverlay(_vUrl,_vBounds,{opacity:0.65,interactive:false}).addTo(radarMap);
+      document.getElementById('radar-frame-info').textContent='SRC: radar.weather.gov/ridge — REFRESHES EVERY 5 MIN';
+    };
+    var _vAttempt=0;
+    _vImg.onerror=function(){
+      if(_vAttempt<1){
+        _vAttempt++;
+        setTimeout(function(){_vImg.src=_vUrl+'?retry='+Date.now();},2000);
+      } else {
+        document.getElementById('radar-frame-info').textContent='VELOCITY UNAVAILABLE FOR '+_vStation+' — TRY ANOTHER STATION';
+      }
+    };
+    _vImg.src=_vUrl;
     document.getElementById('radar-ts').style.display='block';
     document.getElementById('radar-ts').textContent='NWS RIDGE // BASE VELOCITY // '+_radarStation;
-    document.getElementById('radar-frame-info').textContent='SRC: radar.weather.gov/ridge — REFRESHES EVERY 5 MIN';
     if(_showStations)_renderStationMarkers();
     /* Refresh tile every 5 minutes (cache-bust via frame rotation 0-9) */
     var _vFrame=0;
@@ -997,6 +1038,7 @@ function _renderStationMarkers(){
       radarMap.setView([lat,lon],7);
       _applyRadarProduct();        /* in vel_qcd mode this loads velocity GIF for id */
       _renderStationMarkers();     /* re-renders to highlight new active station     */
+      _syncRadarUrl();             /* persist product + station to ?r= param         */
     });
     m.addTo(_stationMarkers);
   });
