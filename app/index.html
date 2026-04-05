@@ -841,7 +841,14 @@ function _showRVFrame(idx){
 function radarPlay(){_rvPaused=false;if(!_rvTimer&&_rvFrames.length){_rvTimer=setInterval(function(){if(_rvPaused)return;_rvIdx=(_rvIdx+1)%_rvFrames.length;_showRVFrame(_rvIdx);},500);}}
 function radarPause(){_rvPaused=true;}
 function setRadarProduct(prod){
+  /* Leaving velocity: stop refresh timer and restore all station markers */
+  if(_radarProduct==='vel_qcd'&&prod!=='vel_qcd'){
+    if(_velRefreshTimer){clearInterval(_velRefreshTimer);_velRefreshTimer=null;}
+    if(_showStations)_renderStationMarkers();  /* re-renders without dimming */
+  }
   _radarProduct=prod;
+  /* Entering velocity with no station: ensure station overlay is visible */
+  if(prod==='vel_qcd'&&!_radarStation&&!_showStations){toggleRadarStations();}
   _applyRadarProduct();
 }
 function setRadarScope(scope){
