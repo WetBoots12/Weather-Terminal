@@ -858,25 +858,52 @@ function _applyRadarProduct(){
     if(isNat||_radarLat!==null)_doRadarLoad();
     return;
   }
-  /* Switch to IEM NEXRAD composite tiles (CORS-friendly EPSG:3857 XYZ tiles) */
+  /* Clear animated layers for non-bref products */
   if(_rvTimer){clearInterval(_rvTimer);_rvTimer=null;}
   _rvLayers.forEach(function(l){radarMap.removeLayer(l);});_rvLayers=[];_rvFrames=[];
   if(_ridgeLayer){radarMap.removeLayer(_ridgeLayer);_ridgeLayer=null;}
-  /* IEM tile product paths — XYZ tiles in EPSG:900913 (=3857), no CORS issues */
+  /* ── VELOCITY: per-station only via NWS RIDGE2 WMS (cannot composite nationally) ── */
+  if(_radarProduct==='vel_qcd'){
+    var st=(_radarStation||'').toLowerCase();
+    if(!st){
+      /* No station selected — prompt the user */
+      document.getElementById('radar-ts').style.display='block';
+      document.getElementById('radar-ts').textContent='VELOCITY — SELECT A LOCAL STATION';
+      document.getElementById('radar-frame-info').textContent='VELOCITY IS PER-STATION — ENABLE ◎ STATIONS AND CLICK ONE ON THE MAP';
+      if(!_showStations)toggleRadarStations();
+      else _renderStationMarkers();
+      return;
+    }
+    var vUrl='https://opengeo.ncep.noaa.gov/geoserver/'+st+'/'+st+'_vel_qcd/ows';
+    _ridgeLayer=L.tileLayer.wms(vUrl,{
+      layers:st+'_vel_qcd',format:'image/png',transparent:true,
+      version:'1.1.1',opacity:0.85,maxZoom:12
+    });
+    _ridgeLayer.on('tileerror',function(){
+      document.getElementById('radar-frame-info').textContent='NWS VELOCITY UNAVAILABLE FOR '+st.toUpperCase()+' — TRY ANOTHER STATION';
+    });
+    _ridgeLayer.addTo(radarMap);
+    document.getElementById('radar-ts').style.display='block';
+    document.getElementById('radar-ts').textContent='NWS RIDGE2 // VELOCITY // '+st.toUpperCase();
+    document.getElementById('radar-frame-info').textContent='NWS RIDGE2 — BASE VELOCITY — CURRENT SCAN';
+    if(_showStations)_renderStationMarkers();
+    return;
+  }
+  /* ── COMP REFL + ECHO TOPS: IEM NEXRAD composite tiles (CORS-friendly XYZ) ── */
   var _iemMap={
-    cref_qcd:'nexrad-n0r-900913',  /* NEXRAD composite base reflectivity */
-    vel_qcd: 'nexrad-n0u-900913',  /* NEXRAD composite base velocity */
-    eet:     'nexrad-eet-900913'   /* NEXRAD enhanced echo tops */
+    cref_qcd:'nexrad-n0r-900913',
+    eet:     'nexrad-eet-900913'
   };
   var iemProd=_iemMap[_radarProduct];
   if(!iemProd){return;}
   var tileUrl='https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/'+iemProd+'/{z}/{x}/{y}.png';
   _ridgeLayer=L.tileLayer(tileUrl,{opacity:0.75,maxZoom:12,tileSize:256,attribution:''}).addTo(radarMap);
-  var pLabels={bref_qcd:'BASE REFL',cref_qcd:'COMP REFL',vel_qcd:'VELOCITY',eet:'ECHO TOPS'};
+  var pLabels={cref_qcd:'COMP REFL',eet:'ECHO TOPS'};
   var scopeLabel=isNat?'NATIONAL':(_radarStation||'LOCAL');
   document.getElementById('radar-ts').style.display='block';
   document.getElementById('radar-ts').textContent='IEM NEXRAD // '+(pLabels[_radarProduct]||_radarProduct)+' // '+scopeLabel;
   document.getElementById('radar-frame-info').textContent='IEM NEXRAD — CURRENT COMPOSITE — STATIC';
+  if(_showStations)_renderStationMarkers();
 }
 function _updateRadarProductUI(){
   var pMap={bref:'bref_qcd',cref:'cref_qcd',vel:'vel_qcd',eet:'eet'};
@@ -916,13 +943,15 @@ function toggleRadarStations(){
 function _renderStationMarkers(){
   if(_stationMarkers)radarMap.removeLayer(_stationMarkers);
   _stationMarkers=L.layerGroup().addTo(radarMap);
+  var velMode=(_radarProduct==='vel_qcd');
   _nexradStations.forEach(function(s){
     var id=s[0],name=s[1],lat=s[2],lon=s[3];
     var isActive=(id===_radarStation);
+    var isDimmed=velMode&&!isActive;
     var sz=isActive?14:10;
     var icon=L.divIcon({
       className:'',
-      html:'<div style="width:'+sz+'px;height:'+sz+'px;background:'+(isActive?'#ffb400':'rgba(255,180,0,.25)')+';border:'+(isActive?'2':'1')+'px solid #ffb400;transform:rotate(45deg);cursor:pointer"></div>',
+      html:'<div style="width:'+sz+'px;height:'+sz+'px;opacity:'+(isDimmed?'0.2':'1')+';pointer-events:'+(isDimmed?'none':'auto')+'"><div style="width:100%;height:100%;background:'+(isActive?'#ffb400':'rgba(255,180,0,.25)')+';border:'+(isActive?'2':'1')+'px solid #ffb400;transform:rotate(45deg);cursor:pointer"></div></div>',
       iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
     });
     var m=L.marker([lat,lon],{icon:icon,zIndexOffset:isActive?1000:0});
