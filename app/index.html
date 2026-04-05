@@ -840,12 +840,10 @@ function _showRVFrame(idx){
 function radarPlay(){_rvPaused=false;if(!_rvTimer&&_rvFrames.length){_rvTimer=setInterval(function(){if(_rvPaused)return;_rvIdx=(_rvIdx+1)%_rvFrames.length;_showRVFrame(_rvIdx);},500);}}
 function radarPause(){_rvPaused=true;}
 function setRadarProduct(prod){
-  if(prod==='vel_qcd'&&_radarScope==='national'){_radarScope='local';}
   _radarProduct=prod;
   _applyRadarProduct();
 }
 function setRadarScope(scope){
-  if(scope==='national'&&_radarProduct==='vel_qcd'){_radarProduct='bref_qcd';}
   _radarScope=scope;
   _applyRadarProduct();
 }
@@ -860,41 +858,36 @@ function _applyRadarProduct(){
     if(isNat||_radarLat!==null)_doRadarLoad();
     return;
   }
-  /* Switch to NWS RIDGE2 WMS */
+  /* Switch to IEM NEXRAD composite tiles (CORS-friendly EPSG:3857 XYZ tiles) */
   if(_rvTimer){clearInterval(_rvTimer);_rvTimer=null;}
   _rvLayers.forEach(function(l){radarMap.removeLayer(l);});_rvLayers=[];_rvFrames=[];
   if(_ridgeLayer){radarMap.removeLayer(_ridgeLayer);_ridgeLayer=null;}
-  var st=(_radarStation||'').toLowerCase();
-  /* Velocity requires a specific station — prompt user if none set */
-  if(!isNat&&!st){
-    document.getElementById('radar-frame-info').textContent='SELECT A STATION — ENABLE ◎ STATIONS AND CLICK A RADAR ON THE MAP';
-    if(!_showStations)toggleRadarStations();
-    return;
-  }
-  var useNat=isNat||(!st&&_radarProduct!=='vel_qcd');
-  var url,lyr;
-  if(useNat){url='https://opengeo.ncep.noaa.gov/geoserver/conus/conus_'+_radarProduct+'/ows';lyr='conus_'+_radarProduct;}
-  else{url='https://opengeo.ncep.noaa.gov/geoserver/'+st+'/'+st+'_'+_radarProduct+'/ows';lyr=st+'_'+_radarProduct;}
-  _ridgeLayer=L.tileLayer.wms(url,{layers:lyr,format:'image/png',transparent:true,version:'1.1.1',opacity:0.75,maxZoom:12});
-  _ridgeLayer.on('tileerror',function(){document.getElementById('radar-frame-info').textContent='RIDGE2 TILE ERROR — PRODUCT MAY NOT HAVE RECENT DATA FOR THIS STATION';});
-  _ridgeLayer.addTo(radarMap);
+  /* IEM tile product paths — XYZ tiles in EPSG:900913 (=3857), no CORS issues */
+  var _iemMap={
+    cref_qcd:'nexrad-n0r-900913',  /* NEXRAD composite base reflectivity */
+    vel_qcd: 'nexrad-n0u-900913',  /* NEXRAD composite base velocity */
+    eet:     'nexrad-eet-900913'   /* NEXRAD enhanced echo tops */
+  };
+  var iemProd=_iemMap[_radarProduct];
+  if(!iemProd){return;}
+  var tileUrl='https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/'+iemProd+'/{z}/{x}/{y}.png';
+  _ridgeLayer=L.tileLayer(tileUrl,{opacity:0.75,maxZoom:12,tileSize:256,attribution:''}).addTo(radarMap);
   var pLabels={bref_qcd:'BASE REFL',cref_qcd:'COMP REFL',vel_qcd:'VELOCITY',eet:'ECHO TOPS'};
-  var scopeLabel=useNat?'NATIONAL':(st.toUpperCase());
+  var scopeLabel=isNat?'NATIONAL':(_radarStation||'LOCAL');
   document.getElementById('radar-ts').style.display='block';
-  document.getElementById('radar-ts').textContent='NWS RIDGE2 // '+(pLabels[_radarProduct]||_radarProduct)+' // '+scopeLabel;
-  document.getElementById('radar-frame-info').textContent='NWS RIDGE2 — CURRENT FRAME — STATIC';
+  document.getElementById('radar-ts').textContent='IEM NEXRAD // '+(pLabels[_radarProduct]||_radarProduct)+' // '+scopeLabel;
+  document.getElementById('radar-frame-info').textContent='IEM NEXRAD — CURRENT COMPOSITE — STATIC';
 }
 function _updateRadarProductUI(){
   var pMap={bref:'bref_qcd',cref:'cref_qcd',vel:'vel_qcd',eet:'eet'};
   Object.keys(pMap).forEach(function(k){
     var el=document.getElementById('rprod-'+k);if(!el)return;
     var active=pMap[k]===_radarProduct;
-    var disabled=(k==='vel'&&_radarScope==='national');
     el.style.background=active?'rgba(255,180,0,.28)':'rgba(255,180,0,.05)';
     el.style.color=active?'#ffb400':'rgba(255,180,0,.55)';
     el.style.borderColor=active?'#ffb400':'rgba(255,180,0,.25)';
-    el.style.opacity=disabled?'0.3':'1';
-    el.style.pointerEvents=disabled?'none':'auto';
+    el.style.opacity='1';
+    el.style.pointerEvents='auto';
   });
   ['national','local'].forEach(function(s){
     var el=document.getElementById('rsc-'+s);if(!el)return;
