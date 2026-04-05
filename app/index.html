@@ -848,6 +848,17 @@ function setRadarScope(scope){
   _radarScope=scope;
   _applyRadarProduct();
 }
+/* ── Velocity helper: static GIF from radar.weather.gov/ridge ── */
+function _getVelocityUrl(stationId,frame){
+  var f=(frame==='loop')?'loop':String(frame||0);
+  return 'https://radar.weather.gov/ridge/standard/base_velocity/'+stationId+'_'+f+'.gif';
+}
+function _calcRadarBounds(lat,lon,rangeKm){
+  rangeKm=rangeKm||230;
+  var latD=rangeKm/111;
+  var lonD=rangeKm/(111*Math.cos(lat*Math.PI/180));
+  return L.latLngBounds([lat-latD,lon-lonD],[lat+latD,lon+lonD]);
+}
 function _applyRadarProduct(){
   if(!radarMap)return;
   _updateRadarProductUI();
