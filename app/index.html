@@ -712,7 +712,7 @@ var _NEXRAD=[
 ['KBOX','Boston MA',41.9558,-71.1369],['KBRO','Brownsville TX',25.9156,-97.4189],
 ['KBUF','Buffalo NY',42.9489,-78.7369],['KBYX','Key West FL',24.5975,-81.7033],
 ['KCAE','Columbia SC',33.9487,-81.1183],['KCBW','Caribou ME',46.0392,-67.8069],
-['KCCX','State College PA',40.9228,-78.0036],['KCLE','Cleveland OH',41.4131,-81.8597],
+['KCBX','Boise ID',43.4908,-116.2360],['KCCX','State College PA',40.9228,-78.0036],['KCLE','Cleveland OH',41.4131,-81.8597],
 ['KCLX','Charleston SC',32.6556,-81.0422],['KCRP','Corpus Christi TX',27.7842,-97.5111],
 ['KCXX','Burlington VT',44.5111,-73.1661],['KCYS','Cheyenne WY',41.1519,-104.8061],
 ['KDAX','Sacramento CA',38.5011,-121.6778],['KDDC','Dodge City KS',37.7208,-99.9689],
@@ -738,11 +738,11 @@ var _NEXRAD=[
 ['KHPX','Fort Campbell KY',36.7369,-87.2847],['KHTX','Huntsville AL',34.9306,-86.0836],
 ['KICT','Wichita KS',37.6544,-97.4428],['KICX','Cedar City UT',37.5908,-112.8619],
 ['KILN','Cincinnati OH',39.4203,-83.8217],['KILX','Lincoln IL',40.1506,-89.3367],
-['KIWX','Fort Wayne IN',41.3586,-85.7000],['KJAX','Jacksonville FL',30.4844,-81.7019],
+['KINX','Tulsa OK',36.1750,-95.5644],['KIWX','Fort Wayne IN',41.3586,-85.7000],['KJAX','Jacksonville FL',30.4844,-81.7019],
 ['KJGX','Robins AFB GA',32.6753,-83.3508],['KJKL','Jackson KY',37.5908,-83.3131],
 ['KLBB','Lubbock TX',33.6542,-101.8139],['KLCH','Lake Charles LA',30.1253,-93.2161],
 ['KLIX','New Orleans LA',30.3367,-89.8253],['KLNX','North Platte NE',41.9578,-100.5761],
-['KLOT','Chicago IL',41.6044,-88.0847],['KLRX','Elko NV',40.7397,-116.8028],
+['KLGX','Langley Hill WA',47.1167,-124.1069],['KLOT','Chicago IL',41.6044,-88.0847],['KLRX','Elko NV',40.7397,-116.8028],
 ['KLSX','St. Louis MO',38.6989,-90.6828],['KLTX','Wilmington NC',33.9892,-78.4289],
 ['KLVX','Louisville KY',37.9753,-85.9439],['KLWX','Sterling VA',38.9753,-77.4778],
 ['KLZK','Little Rock AR',34.8364,-92.2619],['KMAF','Midland TX',31.9433,-102.1894],
@@ -862,47 +862,27 @@ function _applyRadarProduct(){
   if(_rvTimer){clearInterval(_rvTimer);_rvTimer=null;}
   _rvLayers.forEach(function(l){radarMap.removeLayer(l);});_rvLayers=[];_rvFrames=[];
   if(_ridgeLayer){radarMap.removeLayer(_ridgeLayer);_ridgeLayer=null;}
-  /* ── VELOCITY: per-station only via NWS RIDGE2 WMS (cannot composite nationally) ── */
-  if(_radarProduct==='vel_qcd'){
-    var st=(_radarStation||'').toLowerCase();
-    if(!st){
-      /* No station selected — prompt the user */
-      document.getElementById('radar-ts').style.display='block';
-      document.getElementById('radar-ts').textContent='VELOCITY — SELECT A LOCAL STATION';
-      document.getElementById('radar-frame-info').textContent='VELOCITY IS PER-STATION — ENABLE ◎ STATIONS AND CLICK ONE ON THE MAP';
-      if(!_showStations)toggleRadarStations();
-      else _renderStationMarkers();
-      return;
-    }
-    var vUrl='https://opengeo.ncep.noaa.gov/geoserver/'+st+'/'+st+'_vel_qcd/ows';
-    _ridgeLayer=L.tileLayer.wms(vUrl,{
-      layers:st+'_vel_qcd',format:'image/png',transparent:true,
-      version:'1.1.1',opacity:0.85,maxZoom:12
-    });
-    _ridgeLayer.on('tileerror',function(){
-      document.getElementById('radar-frame-info').textContent='NWS VELOCITY UNAVAILABLE FOR '+st.toUpperCase()+' — TRY ANOTHER STATION';
-    });
-    _ridgeLayer.addTo(radarMap);
-    document.getElementById('radar-ts').style.display='block';
-    document.getElementById('radar-ts').textContent='NWS RIDGE2 // VELOCITY // '+st.toUpperCase();
-    document.getElementById('radar-frame-info').textContent='NWS RIDGE2 — BASE VELOCITY — CURRENT SCAN';
-    if(_showStations)_renderStationMarkers();
-    return;
-  }
-  /* ── COMP REFL + ECHO TOPS: IEM NEXRAD composite tiles (CORS-friendly XYZ) ── */
+  /* ── ALL IEM NEXRAD composite tile products ──
+     vel_qcd uses nexrad-n0u-900913 (base velocity composite).
+     NOTE: velocity tiles are BLANK during clear weather — data only shows
+     where active precipitation/storms exist. This is expected behavior.      */
   var _iemMap={
-    cref_qcd:'nexrad-n0r-900913',
-    eet:     'nexrad-eet-900913'
+    cref_qcd:'nexrad-n0r-900913',   /* NEXRAD composite base reflectivity     */
+    vel_qcd: 'nexrad-n0u-900913',   /* NEXRAD composite base velocity         */
+    eet:     'nexrad-eet-900913'    /* NEXRAD enhanced echo tops              */
   };
   var iemProd=_iemMap[_radarProduct];
   if(!iemProd){return;}
   var tileUrl='https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/'+iemProd+'/{z}/{x}/{y}.png';
   _ridgeLayer=L.tileLayer(tileUrl,{opacity:0.75,maxZoom:12,tileSize:256,attribution:''}).addTo(radarMap);
-  var pLabels={cref_qcd:'COMP REFL',eet:'ECHO TOPS'};
+  var pLabels={cref_qcd:'COMP REFL',vel_qcd:'VELOCITY',eet:'ECHO TOPS'};
   var scopeLabel=isNat?'NATIONAL':(_radarStation||'LOCAL');
   document.getElementById('radar-ts').style.display='block';
   document.getElementById('radar-ts').textContent='IEM NEXRAD // '+(pLabels[_radarProduct]||_radarProduct)+' // '+scopeLabel;
-  document.getElementById('radar-frame-info').textContent='IEM NEXRAD — CURRENT COMPOSITE — STATIC';
+  var frameNote=(_radarProduct==='vel_qcd')
+    ?'IEM NEXRAD — BASE VELOCITY — SHOWS ONLY DURING ACTIVE STORMS'
+    :'IEM NEXRAD — CURRENT COMPOSITE — STATIC';
+  document.getElementById('radar-frame-info').textContent=frameNote;
   if(_showStations)_renderStationMarkers();
 }
 function _updateRadarProductUI(){
@@ -951,7 +931,7 @@ function _renderStationMarkers(){
     var sz=isActive?14:10;
     var icon=L.divIcon({
       className:'',
-      html:'<div style="width:'+sz+'px;height:'+sz+'px;opacity:'+(isDimmed?'0.2':'1')+';pointer-events:'+(isDimmed?'none':'auto')+'"><div style="width:100%;height:100%;background:'+(isActive?'#ffb400':'rgba(255,180,0,.25)')+';border:'+(isActive?'2':'1')+'px solid #ffb400;transform:rotate(45deg);cursor:pointer"></div></div>',
+      html:'<div style="width:'+sz+'px;height:'+sz+'px;opacity:'+(isDimmed?'0.25':'1')+'"><div style="width:100%;height:100%;background:'+(isActive?'#ffb400':'rgba(255,180,0,.25)')+';border:'+(isActive?'2':'1')+'px solid #ffb400;transform:rotate(45deg);cursor:pointer"></div></div>',
       iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
     });
     var m=L.marker([lat,lon],{icon:icon,zIndexOffset:isActive?1000:0});
