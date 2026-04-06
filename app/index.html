@@ -1049,15 +1049,16 @@ function _renderStationMarkers(){
       className:'leaflet-tooltip',
       offset:[0,-8]
     });
-    m.on('click',function(){
+    m.on('click',function(e){
+      L.DomEvent.stopPropagation(e);  /* prevent click bleeding through to map drag */
       _radarStation=id;_radarLat=lat;_radarLon=lon;
       _radarScope='local';
       document.getElementById('radar-info').innerHTML='STATION: '+id+'<br>LAT: '+lat.toFixed(2)+'° LON: '+lon.toFixed(2)+'°';
       document.getElementById('radar-ph').style.display='none';
       radarMap.setView([lat,lon],7);
-      _applyRadarProduct();        /* in vel_qcd mode this loads velocity GIF for id */
-      _renderStationMarkers();     /* re-renders to highlight new active station     */
-      _syncRadarUrl();             /* persist product + station to ?r= param         */
+      _applyRadarProduct();
+      _renderStationMarkers();
+      _syncRadarUrl();
     });
     m.addTo(_stationMarkers);
   });
