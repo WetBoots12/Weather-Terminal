@@ -1140,6 +1140,12 @@ function _fetchLiveTLEs(){
   });
 }
 function _initExtraSats(){_initGEOSats();_initLEOSats();_fetchLiveTLEs();}
+/* Step 6: clear all radar intervals on page unload to prevent memory leaks */
+window.addEventListener('beforeunload',function(){
+  if(_velRefreshTimer){clearInterval(_velRefreshTimer);}
+  if(_rvTimer){clearInterval(_rvTimer);}
+  if(_rvRefreshTimer){clearInterval(_rvRefreshTimer);}
+});
 </script>
 </body>
 </html>
