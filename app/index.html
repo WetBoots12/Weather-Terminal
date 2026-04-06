@@ -924,9 +924,8 @@ function _applyRadarProduct(){
   if(_rvTimer){clearInterval(_rvTimer);_rvTimer=null;}
   _rvLayers.forEach(function(l){radarMap.removeLayer(l);});_rvLayers=[];_rvFrames=[];
   if(_ridgeLayer){radarMap.removeLayer(_ridgeLayer);_ridgeLayer=null;}
-  /* ── VELOCITY: imageOverlay from radar.weather.gov/ridge/standard/base_velocity/ ── */
+  /* ── VELOCITY: per-station via NWS opengeo GeoServer (version 1.3.0 + EPSG:4326) ── */
   if(_radarProduct==='vel_qcd'){
-    if(_velRefreshTimer){clearInterval(_velRefreshTimer);_velRefreshTimer=null;}
     if(!_radarStation){
       document.getElementById('radar-ts').style.display='block';
       document.getElementById('radar-ts').textContent='VELOCITY // LOCAL STATION REQUIRED';
@@ -935,44 +934,16 @@ function _applyRadarProduct(){
       else _renderStationMarkers();
       return;
     }
-    /* Find station lat/lon from hardcoded array */
-    var _vSt=_nexradStations.filter(function(s){return s[0]===_radarStation;})[0];
-    if(!_vSt){
-      document.getElementById('radar-frame-info').textContent='STATION '+_radarStation+' NOT FOUND — TRY ANOTHER';
-      return;
-    }
-    var _vLat=_vSt[2],_vLon=_vSt[3];
-    var _vBounds=_calcRadarBounds(_vLat,_vLon,230);
-    var _vUrl=_getVelocityUrl(_radarStation,0);
-    document.getElementById('radar-frame-info').textContent='LOADING VELOCITY — '+_radarStation+'…';
-    /* Step 6: probe URL before adding overlay; retry once on failure */
-    var _vImg=new Image();
-    var _vStation=_radarStation; /* capture for async closure */
-    _vImg.onload=function(){
-      if(_radarProduct!=='vel_qcd'||_radarStation!==_vStation)return; /* stale */
-      _ridgeLayer=L.imageOverlay(_vUrl,_vBounds,{opacity:0.65,interactive:false}).addTo(radarMap);
-      document.getElementById('radar-frame-info').textContent='SRC: radar.weather.gov/ridge — REFRESHES EVERY 5 MIN';
-    };
-    var _vAttempt=0;
-    _vImg.onerror=function(){
-      if(_vAttempt<1){
-        _vAttempt++;
-        setTimeout(function(){_vImg.src=_vUrl+'?retry='+Date.now();},2000);
-      } else {
-        document.getElementById('radar-frame-info').textContent='VELOCITY UNAVAILABLE FOR '+_vStation+' — TRY ANOTHER STATION';
-      }
-    };
-    _vImg.src=_vUrl;
+    var stId=_radarStation.toLowerCase();
+    _ridgeLayer=L.tileLayer.wms(
+      'https://opengeo.ncep.noaa.gov/geoserver/'+stId+'/ows',
+      {layers:stId+'_vel_qcd',format:'image/png',transparent:true,
+       version:'1.3.0',crs:L.CRS.EPSG4326,opacity:0.75}
+    ).addTo(radarMap);
     document.getElementById('radar-ts').style.display='block';
-    document.getElementById('radar-ts').textContent='NWS RIDGE // BASE VELOCITY // '+_radarStation;
+    document.getElementById('radar-ts').textContent='NWS OPENGEO // SR_BVEL // '+_radarStation;
+    document.getElementById('radar-frame-info').textContent='* SRC: NWS OPENGEO // SR_BVEL\n* STATION: '+_radarStation;
     if(_showStations)_renderStationMarkers();
-    /* Refresh tile every 5 minutes (cache-bust via frame rotation 0-9) */
-    var _vFrame=0;
-    _velRefreshTimer=setInterval(function(){
-      if(_radarProduct!=='vel_qcd'||!_ridgeLayer)return;
-      _vFrame=(_vFrame+1)%10;
-      _ridgeLayer.setUrl(_getVelocityUrl(_radarStation,_vFrame)+'?t='+Date.now());
-    },300000);
     return;
   }
   /* ── COMP REFL + ECHO TOPS: IEM NEXRAD composite tiles (CORS-friendly XYZ) ── */
@@ -1039,7 +1010,7 @@ function _renderStationMarkers(){
     var sz=isActive?14:10;
     var icon=L.divIcon({
       className:'',
-      html:'<div style="width:'+sz+'px;height:'+sz+'px;opacity:'+(isDimmed?'0.25':'1')+';pointer-events:'+(isDimmed?'none':'auto')+'"><div style="width:100%;height:100%;background:'+(isActive?'#ffb400':'rgba(255,180,0,.25)')+';border:'+(isActive?'2':'1')+'px solid #ffb400;transform:rotate(45deg);cursor:'+(isDimmed?'default':'pointer')+'"></div></div>',
+      html:'<div style="width:'+sz+'px;height:'+sz+'px;opacity:'+(isDimmed?'0.25':'1')+'"><div style="width:100%;height:100%;background:'+(isActive?'#ffb400':'rgba(255,180,0,.25)')+';border:'+(isActive?'2':'1')+'px solid #ffb400;transform:rotate(45deg);cursor:pointer"></div></div>',
       iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
     });
     var m=L.marker([lat,lon],{icon:icon,zIndexOffset:isActive?1000:0,
