@@ -818,6 +818,25 @@ function initRadarMap(){
   if(_radarLat===null){_radarScope='national';}
   _updateRadarProductUI();
   _doRadarLoad();
+  /* Fetch live station list from NWS API; fall back to hardcoded _NEXRAD on timeout/error */
+  var _fetchDone=false;
+  var _fetchTimer=setTimeout(function(){
+    if(!_fetchDone){_fetchDone=true;} /* timeout — keep _nexradStations as-is */
+  },5000);
+  fetch('https://api.weather.gov/radar/stations',{headers:{'User-Agent':'WeatherTerminal/1.0'}})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(_fetchDone)return;
+      _fetchDone=true;clearTimeout(_fetchTimer);
+      var features=d&&d.features;
+      if(!features||!features.length)return;
+      var live=features.map(function(f){
+        var c=f.geometry&&f.geometry.coordinates;
+        return c?[f.properties.stationIdentifier,f.properties.name,c[1],c[0]]:null;
+      }).filter(Boolean);
+      if(live.length>10){_nexradStations=live;}  /* only replace if response is substantial */
+    })
+    .catch(function(){clearTimeout(_fetchTimer);});
 }
 function updateRadarLocation(lat,lon,stationId){
   var firstSet=(_radarLat===null);
