@@ -794,6 +794,9 @@ function getRadarTileUrl(stationId,product,frame){
   var productPath=(product==='velocity')?'base_velocity':'base_reflectivity';
   return 'https://radar.weather.gov/ridge/standard/'+productPath+'/'+stationId+'_'+frameStr+'.gif';
 }
+function calculateRadarBounds(lat,lon,rangeKm){
+  return _calcRadarBounds(lat,lon,rangeKm||230);
+}
 /* ── Step 5: URL state helpers ── */
 function _syncRadarUrl(){
   try{
@@ -816,6 +819,27 @@ function _restoreRadarUrl(){
     if(st&&/^[A-Z]{4}$/.test(st)){_radarStation=st;}
   }catch(e){}
 }
+function loadStationsData(){
+  var fallback=function(){
+    stationsCache=_nexradStations.map(function(s){
+      return Array.isArray(s)?{id:s[0],name:s[1],lat:s[2],lon:s[3]}:s;
+    });
+  };
+  return fetch('https://api.weather.gov/radar/stations',{
+    headers:{'User-Agent':'WeatherTerminal/1.0'},
+    signal:AbortSignal.timeout(5000)
+  }).then(function(r){return r.json();})
+  .then(function(d){
+    var features=d&&d.features;
+    if(!features||features.length<10){fallback();return;}
+    var live=features.map(function(f){
+      var c=f.geometry&&f.geometry.coordinates;
+      return c?{id:f.properties.stationIdentifier,name:f.properties.name,lat:c[1],lon:c[0]}:null;
+    }).filter(Boolean);
+    if(live.length>10){stationsCache=live;_nexradStations=live.map(function(s){return[s.id,s.name,s.lat,s.lon];});}
+    else{fallback();}
+  }).catch(fallback);
+}
 function initRadarMap(){
   radarReady=true;
   _restoreRadarUrl();
@@ -825,25 +849,7 @@ function initRadarMap(){
   if(_radarLat===null){_radarScope='national';}
   _updateRadarProductUI();
   _doRadarLoad();
-  /* Fetch live station list from NWS API; fall back to hardcoded _NEXRAD on timeout/error */
-  var _fetchDone=false;
-  var _fetchTimer=setTimeout(function(){
-    if(!_fetchDone){_fetchDone=true;} /* timeout — keep _nexradStations as-is */
-  },5000);
-  fetch('https://api.weather.gov/radar/stations',{headers:{'User-Agent':'WeatherTerminal/1.0'}})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(_fetchDone)return;
-      _fetchDone=true;clearTimeout(_fetchTimer);
-      var features=d&&d.features;
-      if(!features||!features.length)return;
-      var live=features.map(function(f){
-        var c=f.geometry&&f.geometry.coordinates;
-        return c?[f.properties.stationIdentifier,f.properties.name,c[1],c[0]]:null;
-      }).filter(Boolean);
-      if(live.length>10){_nexradStations=live;}  /* only replace if response is substantial */
-    })
-    .catch(function(){clearTimeout(_fetchTimer);});
+  loadStationsData();
 }
 function updateRadarLocation(lat,lon,stationId){
   var firstSet=(_radarLat===null);
@@ -893,17 +899,71 @@ function setRadarProduct(prod){
   /* Leaving velocity: stop refresh timer and restore all station markers */
   if(_radarProduct==='vel_qcd'&&prod!=='vel_qcd'){
     if(_velRefreshTimer){clearInterval(_velRefreshTimer);_velRefreshTimer=null;}
+    cleanupRadarLayer();
     if(_showStations)_renderStationMarkers();  /* re-renders without dimming */
   }
   _radarProduct=prod;
   /* Entering velocity with no station: ensure station overlay is visible */
-  if(prod==='vel_qcd'&&!_radarStation&&!_showStations){toggleRadarStations();}
+  if(prod==='vel_qcd'&&!_radarStation){
+    updateStatus('VELOCITY: Click a station on the map first');
+    if(!_showStations)toggleRadarStations();
+  }
   _applyRadarProduct();
   _syncRadarUrl();
 }
 function setRadarScope(scope){
   _radarScope=scope;
   _applyRadarProduct();
+}
+function updateStatus(message){
+  var el=document.getElementById('radar-frame-info');
+  if(el)el.textContent=message;
+}
+function cleanupRadarLayer(){
+  if(activeRadarLayer&&radarMap){radarMap.removeLayer(activeRadarLayer);activeRadarLayer=null;}
+  if(refreshIntervalId){clearInterval(refreshIntervalId);refreshIntervalId=null;}
+}
+function updateStationMarkerStyles(selectedId){
+  document.querySelectorAll('.station-marker').forEach(function(m){
+    var sid=m.dataset.stationId;
+    m.style.opacity=(sid===selectedId)?'0.9':'0.25';
+    m.style.pointerEvents=(sid===selectedId)?'auto':'none';
+  });
+}
+function loadStationRadarData(stationId,product){
+  if(!stationId||stationId.length!==4)return;
+  var cache=stationsCache.length?stationsCache:_nexradStations.map(function(s){
+    return Array.isArray(s)?{id:s[0],name:s[1],lat:s[2],lon:s[3]}:s;
+  });
+  var station=cache.filter(function(s){return s.id===stationId;})[0];
+  if(!station){updateStatus('STATION '+stationId+' NOT FOUND — TRY ANOTHER');return;}
+  cleanupRadarLayer();
+  var bounds=calculateRadarBounds(station.lat,station.lon,230);
+  var tileUrl=getRadarTileUrl(stationId,product,0);
+  activeRadarLayer=L.imageOverlay(tileUrl,bounds,{opacity:0.65,interactive:false}).addTo(radarMap);
+  activeRadarLayer.on('error',function(){
+    setTimeout(function(){
+      if(activeRadarLayer){activeRadarLayer.setUrl(getRadarTileUrl(stationId,product,0)+'?retry='+Date.now());}
+    },2000);
+  });
+  document.getElementById('radar-ts').style.display='block';
+  document.getElementById('radar-ts').textContent='NWS RIDGE // '+(product==='velocity'?'BASE VELOCITY':'BASE REFL')+' // '+stationId;
+  updateStatus('SRC: radar.weather.gov/ridge — REFRESHES EVERY 5 MIN');
+  refreshIntervalId=setInterval(function(){
+    if(activeRadarLayer&&selectedStationId){
+      activeRadarLayer.setUrl(getRadarTileUrl(selectedStationId,product,0)+'?t='+Date.now());
+    }
+  },300000);
+}
+function handleStationSelect(stationId,stationName){
+  selectedStationId=stationId;
+  _radarStation=stationId;
+  updateStationMarkerStyles(stationId);
+  var product=(_radarProduct==='vel_qcd')?'velocity':'reflectivity';
+  currentProduct=product;
+  loadStationRadarData(stationId,product);
+  _updateRadarProductUI();
+  _syncRadarUrl();
 }
 /* ── Velocity helper: static GIF from radar.weather.gov/ridge ── */
 function _getVelocityUrl(stationId,frame){
@@ -931,25 +991,19 @@ function _applyRadarProduct(){
   if(_rvTimer){clearInterval(_rvTimer);_rvTimer=null;}
   _rvLayers.forEach(function(l){radarMap.removeLayer(l);});_rvLayers=[];_rvFrames=[];
   if(_ridgeLayer){radarMap.removeLayer(_ridgeLayer);_ridgeLayer=null;}
-  /* ── VELOCITY: per-station via NWS opengeo GeoServer (version 1.3.0 + EPSG:4326) ── */
+  /* ── VELOCITY: per-station via NWS RIDGE static GIFs (imageOverlay) ── */
   if(_radarProduct==='vel_qcd'){
     if(!_radarStation){
       document.getElementById('radar-ts').style.display='block';
       document.getElementById('radar-ts').textContent='VELOCITY // LOCAL STATION REQUIRED';
-      document.getElementById('radar-frame-info').textContent='SELECT A STATION: ENABLE ◎ STATIONS AND CLICK ONE ON THE MAP';
+      updateStatus('SELECT A STATION: ENABLE ◎ STATIONS AND CLICK ONE ON THE MAP');
       if(!_showStations)toggleRadarStations();
       else _renderStationMarkers();
       return;
     }
-    var stId=_radarStation.toLowerCase();
-    _ridgeLayer=L.tileLayer.wms(
-      'https://opengeo.ncep.noaa.gov/geoserver/'+stId+'/ows',
-      {layers:stId+'_vel_qcd',format:'image/png',transparent:true,
-       version:'1.3.0',crs:L.CRS.EPSG4326,opacity:0.75}
-    ).addTo(radarMap);
-    document.getElementById('radar-ts').style.display='block';
-    document.getElementById('radar-ts').textContent='NWS OPENGEO // SR_BVEL // '+_radarStation;
-    document.getElementById('radar-frame-info').textContent='* SRC: NWS OPENGEO // SR_BVEL\n* STATION: '+_radarStation;
+    selectedStationId=_radarStation;
+    currentProduct='velocity';
+    loadStationRadarData(_radarStation,'velocity');
     if(_showStations)_renderStationMarkers();
     return;
   }
@@ -1028,15 +1082,13 @@ function _renderStationMarkers(){
       offset:[0,-8]
     });
     m.on('click',function(e){
-      L.DomEvent.stopPropagation(e);  /* prevent click bleeding through to map drag */
-      _radarStation=id;_radarLat=lat;_radarLon=lon;
-      _radarScope='local';
+      L.DomEvent.stopPropagation(e);
+      _radarLat=lat;_radarLon=lon;_radarScope='local';
       document.getElementById('radar-info').innerHTML='STATION: '+id+'<br>LAT: '+lat.toFixed(2)+'° LON: '+lon.toFixed(2)+'°';
       document.getElementById('radar-ph').style.display='none';
       radarMap.setView([lat,lon],7);
-      _applyRadarProduct();
+      handleStationSelect(id,name);
       _renderStationMarkers();
-      _syncRadarUrl();
     });
     m.addTo(_stationMarkers);
   });
@@ -1123,6 +1175,7 @@ window.addEventListener('beforeunload',function(){
   if(_velRefreshTimer){clearInterval(_velRefreshTimer);}
   if(_rvTimer){clearInterval(_rvTimer);}
   if(_rvRefreshTimer){clearInterval(_rvRefreshTimer);}
+  if(refreshIntervalId){clearInterval(refreshIntervalId);}
 });
 </script>
 </body>
