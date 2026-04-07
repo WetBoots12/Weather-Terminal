@@ -787,6 +787,7 @@ var radarMap=null,radarReady=false,_radarLat=null,_radarLon=null,_radarStation=n
 var _rvFrames=[],_rvLayers=[],_rvIdx=0,_rvTimer=null,_rvPaused=false,_rvRefreshTimer=null;
 var _radarProduct='bref_qcd',_radarScope='local',_ridgeLayer=null,_velRefreshTimer=null;
 var _nexradStations=_NEXRAD,_stationMarkers=null,_showStations=false;
+var selectedStationId=null,currentProduct='reflectivity',activeRadarLayer=null,refreshIntervalId=null,stationsCache=[];
 /* ── Step 5: URL state helpers ── */
 function _syncRadarUrl(){
   try{
