@@ -896,14 +896,28 @@ function _showRVFrame(idx){
 function radarPlay(){_rvPaused=false;if(!_rvTimer&&_rvFrames.length){_rvTimer=setInterval(function(){if(_rvPaused)return;_rvIdx=(_rvIdx+1)%_rvFrames.length;_showRVFrame(_rvIdx);},500);}}
 function radarPause(){_rvPaused=true;}
 function setRadarProduct(prod){
-  /* Leaving velocity: stop refresh timer and restore all station markers */
   if(_radarProduct==='vel_qcd'&&prod!=='vel_qcd'){
     if(_velRefreshTimer){clearInterval(_velRefreshTimer);_velRefreshTimer=null;}
     cleanupRadarLayer();
-    if(_showStations)_renderStationMarkers();  /* re-renders without dimming */
+    if(_showStations)_renderStationMarkers();
   }
   _radarProduct=prod;
-  /* Entering velocity with no station: ensure station overlay is visible */
+  /* Map internal product key to currentProduct string used by loadStationRadarData */
+  if(prod==='vel_qcd'){currentProduct='velocity';}
+  else if(prod==='cref_qcd'){currentProduct='composite';}
+  else{currentProduct='reflectivity';}
+  /* If a station is already selected, reload its data for the new product */
+  if(selectedStationId&&prod==='vel_qcd'){
+    loadStationRadarData(selectedStationId,'velocity');
+    _syncRadarUrl();
+    return;
+  }
+  if(selectedStationId&&(prod==='bref_qcd'||prod==='cref_qcd')){
+    loadStationRadarData(selectedStationId,currentProduct);
+    _syncRadarUrl();
+    return;
+  }
+  /* No station selected + velocity: prompt user */
   if(prod==='vel_qcd'&&!_radarStation){
     updateStatus('VELOCITY: Click a station on the map first');
     if(!_showStations)toggleRadarStations();
