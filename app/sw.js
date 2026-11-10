@@ -1,6 +1,7 @@
-const CACHE = 'goes-star-v5';
+const CACHE = 'goes-star-v6';
 const ASSETS = [
   './index.html',
+  './guide.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
