@@ -1,0 +1,18 @@
+{
+  "appId": "com.wetboots12.goesstar",
+  "appName": "GOES-STAR",
+  "webDir": "app",
+  "backgroundColor": "#0a0a0a",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0a0a0a",
+    "scrollEnabled": false,
+    "allowsLinkPreview": false
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "overlaysWebView": true
+    }
+  }
+}

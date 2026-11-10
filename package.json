@@ -1,0 +1,25 @@
+{
+  "name": "weather-terminal",
+  "version": "1.1.0",
+  "private": true,
+  "description": "GOES-STAR Command weather terminal: web app plus iOS/iPadOS wrapper (Capacitor)",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "serve": "npx --yes http-server app -p 8080 -c-1",
+    "ios:sync": "npm run vendor && npx cap sync ios",
+    "ios:assets": "npx capacitor-assets generate --ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.0.0",
+    "@fontsource/jetbrains-mono": "^5.0.0",
+    "leaflet": "1.9.4",
+    "satellite.js": "4.1.3",
+    "three": "0.128.0"
+  }
+}
