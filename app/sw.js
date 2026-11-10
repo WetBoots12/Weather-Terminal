@@ -1,9 +1,15 @@
-const CACHE = 'goes-star-v4';
+const CACHE = 'goes-star-v5';
 const ASSETS = [
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './vendor/three.min.js',
+  './vendor/leaflet.js',
+  './vendor/leaflet.css',
+  './vendor/satellite.min.js',
+  './vendor/fonts/jetbrains-mono-400.woff2',
+  './vendor/fonts/jetbrains-mono-700.woff2'
 ];
 
 self.addEventListener('install', e => {
@@ -21,32 +27,35 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  const url = e.request.url;
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
 
-  /* Satellite imagery CDN — network-first, cache on success as fallback for hiccups */
-  if (url.includes('cdn.star.nesdis.noaa.gov')) {
+  /* Satellite imagery "latest" stills — network-first, cached copy as fallback for hiccups */
+  if (url.hostname === 'cdn.star.nesdis.noaa.gov' && !/\/\d{11}_/.test(url.pathname)) {
     e.respondWith(
-      fetch(e.request, {cache: 'no-cache'}).then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
+      fetch(req, {cache: 'no-cache'}).then(res => {
+        if (res.ok) { const clone = res.clone(); caches.open(CACHE).then(c => c.put(req, clone)); }
         return res;
-      }).catch(() => caches.match(e.request).then(cached => cached || new Response('', {status: 503})))
+      }).catch(() => caches.match(req).then(cached => cached || new Response('', {status: 503})))
     );
     return;
   }
 
-  /* Live API calls (NWS, Nominatim) — pure network, no caching */
-  if (url.includes('noaa.gov') || url.includes('weather.gov') ||
-      url.includes('nominatim') || url.includes('googleapis') ||
-      url.includes('rainviewer.com')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503})));
+  /* Everything else cross-origin (APIs, map tiles, timestamped frames) goes straight to the network */
+  if (url.origin !== self.location.origin) return;
+
+  /* App page — network-first so updates show up immediately; cached copy when offline */
+  if (req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('.html')) {
+    e.respondWith(
+      fetch(req).then(res => {
+        if (res.ok) { const clone = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', clone)); }
+        return res;
+      }).catch(() => caches.match('./index.html'))
+    );
     return;
   }
 
-  /* Local app assets — cache-first */
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
-  );
+  /* Bundled libraries, fonts, icons — cache-first */
+  e.respondWith(caches.match(req).then(cached => cached || fetch(req)));
 });
