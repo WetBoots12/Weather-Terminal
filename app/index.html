@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="vendor/leaflet.css"/>
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/satellite.min.js"></script>
+<script src="guide.js"></script>
 <script>
 function toggleMobSidebar(){
   var s=document.getElementById('sidebar');
@@ -261,6 +262,7 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       <button class="tab-btn active" onclick="switchTab('loops',this)">LIVE IMAGERY</button>
       <button class="tab-btn" onclick="switchTab('nws',this)">NWS GROUND</button>
       <button class="tab-btn" onclick="switchTab('radar',this)">RADAR</button>
+      <button class="guide-btn" onclick="openGuide()" aria-label="Open field manual">? GUIDE</button>
     </div>
   </div>
   <div id="clock"><small>SCAN CYCLE SYNC</small>00:00:00 UTC</div>
@@ -289,6 +291,7 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       <div class="phd" style="margin-top:10px">LIVE TEXTURE</div>
       <div id="diskTexStatus" class="stat" style="font-size:9px;opacity:.4">LOAD FULL DISK ON<br>LIVE IMAGERY TAB</div>
       <button id="diskTexBtn" class="btn-ghost" onclick="toggleDiskTexture()" style="display:none;width:100%;margin-top:4px">◉ OVERLAY DISK</button>
+      <button class="btn-ghost" onclick="openGuide()">? HOW TO USE THIS TAB</button>
     </div>
     <div id="panel-loops" class="panel">
       <div class="phd">TARGET PARAMETERS</div>
@@ -362,9 +365,11 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
           <option value="16">Band 16 — IR CO2 LW</option>
         </optgroup>
       </select>
+      <div id="band-note"></div>
       <span class="lbl">ANIMATION FRAMES</span><select id="frameCountSel"><option value="6">6 FRAMES</option><option value="10">10 FRAMES</option><option value="16" selected>16 FRAMES</option><option value="20">20 FRAMES</option><option value="30">30 FRAMES</option></select><button class="btn" onclick="syncImage()">SYNC LATEST IMAGE</button>
       <button class="btn-ghost" onclick="manualRefresh()" id="manualRefreshBtn" style="display:none">↻ MANUAL REFRESH</button>
       <button class="btn-ghost" onclick="resetLoop()">EMERGENCY SYSTEM RESET</button>
+      <button class="btn-ghost" onclick="openGuide()">? HOW TO USE THIS TAB</button>
       <div class="auto-row" id="autoRefreshRow" style="display:none">
         <label class="toggle"><input type="checkbox" id="autoRefreshChk" checked onchange="toggleAutoRefresh()"><span class="slider"></span></label>
         <span>AUTO-REFRESH <span id="autoRefreshCd" style="opacity:.5"></span></span>
@@ -387,6 +392,7 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       <select id="nwsUnits" onchange="setNWSUnits(this.value)" style="background:#111;color:var(--y);border:1px solid var(--ydim2);font-family:inherit;font-size:10px;padding:3px 7px;cursor:pointer;letter-spacing:.05em"><option value="imperial">IMPERIAL</option><option value="metric">METRIC</option></select>
       <button class="btn-ghost" onclick="nwsManualRefresh()" id="nwsRefreshBtn" style="display:none">↻ MANUAL REFRESH</button>
       <button class="btn-ghost" onclick="clearNWS()">CLEAR STATION</button>
+      <button class="btn-ghost" onclick="openGuide()">? HOW TO USE THIS TAB</button>
       <div class="auto-row" id="nwsAutoRow" style="display:none">
         <label class="toggle"><input type="checkbox" id="nwsAutoChk" checked onchange="toggleNWSAuto()"><span class="slider"></span></label>
         <span>AUTO-REFRESH <span id="nwsAutoCd" style="opacity:.5"></span></span>
@@ -399,6 +405,7 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       <div class="phd" style="margin-top:10px">PLAYBACK</div>
       <button class="btn" onclick="radarPlay()">▶ PLAY LOOP</button>
       <button class="btn-ghost" onclick="radarPause()">⏸ PAUSE</button>
+      <button class="btn-ghost" onclick="openGuide()">? HOW TO USE THIS TAB</button>
       <div class="stat" id="radar-frame-info" style="margin-top:8px;font-size:9px;opacity:.5"></div>
     </div>
     <div class="panel" style="margin-top:auto">
