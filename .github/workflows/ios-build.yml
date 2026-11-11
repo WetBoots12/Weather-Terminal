@@ -47,6 +47,7 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          test -f Payload/App.app/public/index.html && test -f Payload/App.app/public/vendor/three.min.js
           zip -qry GOES-STAR.ipa Payload
           ls -lh GOES-STAR.ipa
 
