@@ -22,7 +22,13 @@ var S=[ /* [title, url] */
  ['NWS La Crosse — Why Dew Point vs. Humidity','https://www.weather.gov/arx/why_dewpoint_vs_humidity'],
  ['NOAA GOES — ABI Spectral Attributes and Products','https://www.goes.noaa.gov/abispectralattributes.php'],
  ['RAMMB/CIRA — VISIT Satellite Quick Guides index','https://rammb.cira.colostate.edu/training/visit/quick_guides/'],
- ['NOAA JetStream — Radar Beams','https://www.noaa.gov/jetstream/radar-beams']
+ ['NOAA JetStream — Radar Beams','https://www.noaa.gov/jetstream/radar-beams'],
+ ['NWS Glossary — Storm Relative (SRM)','https://forecast.weather.gov/glossary.php?word=Storm+Relative'],
+ ['NWS Louisville — Storm-Relative Velocity 4-Panel Example','https://www.weather.gov/lmk/nws_radar_SRM-4panel'],
+ ['NWS Jackson, MS — Dual-Pol Radar Products','https://www.weather.gov/jan/dualpolupgrade-products'],
+ ['NOAA WDTD — MRMS QPE, Radar Only','https://vlab.noaa.gov/web/wdtd/-/qpe-radar-only'],
+ ['NOAA GSL — High-Resolution Rapid Refresh (HRRR)','https://rapidrefresh.noaa.gov/hrrr/'],
+ ['Iowa Environmental Mesonet — OGC / Tile Map Services','https://mesonet.agron.iastate.edu/ogc/']
 ];
 function r(){return ' <sup class="g-ref">['+Array.prototype.join.call(arguments,',')+']</sup>';}
 
@@ -120,14 +126,27 @@ var PAGES={
   '<h3>HOW TO USE IT</h3>'+
   '<ol><li>Set a location on <b>NWS GROUND</b> first; the radar centers on it.</li>'+
   '<li><b>NATIONAL</b> shows the U.S. mosaic; <b>LOCAL</b> zooms to your location.</li>'+
-  '<li><b>◎ STATIONS</b> shows every NEXRAD site as a diamond. Tap one to select it; the active station is filled. Velocity needs a station.</li>'+
-  '<li>Choose a product, then <b>▶ PLAY LOOP</b> in the sidebar to animate. Watch storm motion and whether cores strengthen or weaken.</li></ol>'+
+  '<li><b>◎ STATIONS</b> shows every NEXRAD site as a diamond. Tap one to select it; the active station is filled. Velocity, storm-relative velocity and hydrometeor class need a station.</li>'+
+  '<li>Choose a product from the <b>product menu</b> under the map. A <b>color scale</b> for that product appears just above the menu.</li>'+
+  '<li>Base reflectivity and future radar animate; use ❚❚ / ▶ (or <b>▶ PLAY LOOP</b> in the sidebar) to pause and play. Watch storm motion and whether cores strengthen or weaken.</li></ol>'+
   '<h3>PRODUCTS</h3>'+
   '<div class="g-card"><div class="g-card-hd">BASE REFL — BASE REFLECTIVITY</div><p>Echo strength from the lowest radar tilt (0.5°). Updates fastest (as often as every ~90 s) and is the best view of low-level structure: <b>hook echoes</b> and <b>outflow boundaries</b> show up here. It can miss the strongest part of a storm aloft and storms forming close to the radar.'+r(1)+'</p></div>'+
   '<div class="g-card"><div class="g-card-hd">COMP REFL — COMPOSITE REFLECTIVITY</div><p>The highest reflectivity found at any height. Good for judging overall storm intensity and catching hail cores aloft, but it often hides hook echoes and boundaries, and it is only complete after the full volume scan (4-7 minutes).'+r(1)+'</p></div>'+
   '<div class="g-card"><div class="g-card-hd">VELOCITY — BASE RADIAL VELOCITY</div><p>Wind toward or away from the selected radar at the lowest tilt. <b>Green = toward the radar, red = away.</b> Only the part of the wind along the beam is measured, so wind crossing the beam reads zero; the zero line (zero isodop) shows where the wind blows perpendicular to the beam.'+r(2)+'</p>'+
-  '<p><span class="g-k">LOOK FOR</span> a tight <b>couplet</b> of strong green next to strong red: rotation. If a couplet persists 10+ minutes and appears at several heights, tornado formation is possible.'+r(2,3)+' Broad areas of very strong inbound or outbound winds mark damaging straight-line winds (bow echoes, derechos).'+r(1,2)+' This is base velocity, not storm-relative: storm motion is not subtracted, so a fast-moving storm can mask its couplet.'+r(2)+'</p></div>'+
+  '<p><span class="g-k">LOOK FOR</span> a tight <b>couplet</b> of strong green next to strong red: rotation. If a couplet persists 10+ minutes and appears at several heights, tornado formation is possible.'+r(2,3)+' Broad areas of very strong inbound or outbound winds mark damaging straight-line winds (bow echoes, derechos).'+r(1,2)+' This is base velocity, not storm-relative: storm motion is not subtracted, so a fast-moving storm can mask its couplet; switch to storm-relative velocity for that.'+r(2)+'</p></div>'+
   '<div class="g-card"><div class="g-card-hd">ECHO TOPS</div><p>Estimated height of the top of the precipitation. Use it to find the tallest and fastest-growing storms and follow their trends; NWS notes it is less critical for severe weather than reflectivity and velocity.'+r(4)+'</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">STORM-REL VELOCITY — STORM-RELATIVE MOTION (SRM)</div><p>Base velocity with the average motion of the storms subtracted, so you see the wind the storm itself "feels." Same colors as velocity: <b>green = toward the radar, red = away</b>, brighter = faster.'+r(20,21)+'</p>'+
+  '<p><span class="g-k">LOOK FOR</span> tight green/red couplets that base velocity smears out in fast-moving storms. NWS uses SRM to bring out rotation and storm-top divergence that the storm\'s own motion would otherwise hide.'+r(20,21)+' Strong straight-line winds are better judged on base velocity, since subtracting storm motion changes their speed.</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">HYDROMETEOR CLASS — DUAL-POL ECHO TYPE</div><p>The radar\'s best guess at what each echo is, made by combining reflectivity with the dual-polarization measurements (differential reflectivity, correlation coefficient, specific differential phase and velocity). Shown for the lowest tilt of the selected station.'+r(22)+'</p>'+
+  '<table class="g-tbl"><tr><th>COLOR</th><th>CLASS</th><th>WHAT IT MEANS</th></tr>'+
+  [['#00fb90','RA — Rain','Light to moderate rain'],['#00bb00','HR — Heavy rain','Heavy rain'],['#d0d060','BD — Big drops','Few, very large drops; often at the leading edge of new storms'],['#ff0000','HA — Hail + rain','Hail, possibly mixed with rain'],['#d28484','GR — Graupel','Soft hail / snow pellets'],['#ffb0b0','IC — Ice crystals','Small ice crystals, usually high in the cloud'],['#00ffff','DS — Dry snow','Dry snow; often aloft in rain events, at the surface in winter'],['#0090ff','WS — Wet snow','Wet, melting snow; marks the melting layer'],['#9c9c9c','BI — Biological','Birds, insects, bats; common on clear nights'],['#767676','GC — Clutter','Ground clutter or anomalous propagation'],['#e700ff','UK — Unknown','The algorithm could not decide']].map(function(c){return '<tr><td><span style="display:inline-block;width:12px;height:12px;background:'+c[0]+';vertical-align:-2px"></span></td><td>'+c[1]+'</td><td>'+c[2]+'</td></tr>';}).join('')+'</table>'+
+  '<p><span class="g-k">KEEP IN MIND</span> It classifies what the beam sees at its height, not what reaches the ground; far from the radar the beam is thousands of feet up, so snow or ice crystals there can sit over rain at the surface. NWS describes it as a first guess at precipitation type.'+r(22)+'</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">1 / 24 / 72-HR RAINFALL — MRMS RADAR ESTIMATE</div><p>Multi-Radar Multi-Sensor precipitation totals at 1 km: every radar in the network is merged and the rain rate is added up over the period. The 1-hour total updates every 2 minutes; the 24- and 72-hour totals update hourly. Values at or below 0.01 in are removed.'+r(23)+'</p>'+
+  '<p><span class="g-k">READ THE SCALE</span> On the 24/72-hr scale: blue = under 0.5 in, green = 0.5-1 in, yellow = about 2 in, orange to red = 3-4 in, pink = 5 in or more. On the 1-hr scale each inch is an equal step, so most hourly rain shows as blue; cyan and green mean 1.5-3 in in an hour, which is flash-flood territory. The 24/72-hr scale stretches above 1 in; read the tick labels rather than assuming equal steps. Gray areas are outside radar coverage. These are radar-only estimates: hail and bright-band melting can inflate them, and distant or mountain-blocked areas can be underestimated.'+r(23)+'</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">FUTURE RADAR — HRRR MODEL FORECAST</div><p>Simulated reflectivity from NOAA\'s High-Resolution Rapid Refresh, a 3 km model run every hour.'+r(24)+' The loop shows hourly frames from now to the end of the latest run (up to 18 hours), each labeled with its forecast hour and valid time. Same dBZ colors as base reflectivity.</p>'+
+  '<p><span class="g-k">KEEP IN MIND</span> This is a model forecast, not an observation. Use it for timing and coverage trends (will the line reach me this evening?), not exact storm placement; compare it with the latest real radar before relying on it.</p></div>'+
+  '<h3>READING THE COLOR SCALES</h3>'+
+  '<p>The bar above the product menu always matches the product on screen. Numbers under the bar are the product units: <b>dBZ</b> for reflectivity and future radar, <b>knots</b> for velocity (negative = toward the radar), <b>thousands of feet</b> for echo tops, <b>inches</b> for rainfall. Hydrometeor class uses named colors instead of a bar. Colors are drawn slightly transparent over the map, so they look a little darker than the bar.</p>'+
   '<h3>READING THE dBZ SCALE</h3>'+
   '<table class="g-tbl"><tr><th>dBZ</th><th>MEANING</th><th>RAIN RATE</th></tr>'+
   '<tr><td>20-40</td><td>Light precipitation</td><td>trace - 0.45 in/hr</td></tr>'+
@@ -143,7 +162,7 @@ var PAGES={
   '<li><b>Rotational couplet</b> — see Velocity above.</li></ul>'+
   '<h3>LIMITATIONS</h3>'+
   '<p>The beam rises and spreads as it travels: about 1,000 ft wider every 10 miles, and roughly 11,600 ft above the ground 98 miles out. Distant storms are sampled high up, low-level rotation is missed and small features blur, so select the station closest to the storm. Unusual temperature layers can bend the beam to the ground and create false echoes (anomalous propagation).'+r(19)+' Close to the radar, the lowest tilt passes under the upper part of storms.'+r(1)+'</p>'+
-  '<p class="g-dim">Data: RainViewer and Iowa Environmental Mesonet mosaics (reflectivity, echo tops), NWS RIDGE single-site velocity.</p>';}},
+  '<p class="g-dim">Data: Iowa Environmental Mesonet mosaics (RainViewer as backup) (reflectivity, echo tops), NWS RIDGE single-site velocity and storm-relative velocity via IEM, NWS dual-pol hydrometeor class (opengeo.ncep.noaa.gov), NOAA MRMS rainfall and HRRR forecasts via IEM.'+r(25)+'</p>';}},
  sources:{t:'SOURCES',h:function(){return '<h3>SOURCES</h3><p class="g-dim">Primary NOAA/NWS and university training material. Opens in a browser.</p><ol class="g-src">'+S.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+s[0]+'</a></li>';}).join('')+'</ol>';}}
 };
 var ORDER=['overview','3d','loops','nws','radar','sources'];
