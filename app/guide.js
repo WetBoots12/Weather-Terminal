@@ -141,7 +141,7 @@ var PAGES={
   '<li><b>Rotational couplet</b> — see Velocity above.</li></ul>'+
   '<h3>LIMITATIONS</h3>'+
   '<p>The beam rises and spreads as it travels: about 1,000 ft wider every 10 miles, and roughly 11,600 ft above the ground 98 miles out. Distant storms are sampled high up, low-level rotation is missed and small features blur, so select the station closest to the storm. Unusual temperature layers can bend the beam to the ground and create false echoes (anomalous propagation).'+r(19)+' Close to the radar, the lowest tilt passes under the upper part of storms.'+r(1)+'</p>'+
-  '<p class="g-dim">Data: RainViewer and Iowa Environmental Mesonet mosaics (reflectivity, echo tops), NWS RIDGE single-site velocity.</p>';}},
+  '<p class="g-dim">Data: Iowa Environmental Mesonet mosaics (RainViewer as backup) (reflectivity, echo tops), NWS RIDGE single-site velocity.</p>';}},
  sources:{t:'SOURCES',h:function(){return '<h3>SOURCES</h3><p class="g-dim">Primary NOAA/NWS and university training material. Opens in a browser.</p><ol class="g-src">'+S.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+s[0]+'</a></li>';}).join('')+'</ol>';}}
 };
 var ORDER=['overview','3d','loops','nws','radar','sources'];
