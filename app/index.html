@@ -244,6 +244,7 @@ option,optgroup{background:#111;color:var(--y)}
 /* NEXRAD station marker tooltip */
 .leaflet-tooltip{background:#111!important;border:1px solid rgba(255,180,0,.5)!important;border-radius:0!important;color:#ffb400!important;font-family:'JetBrains Mono',monospace!important;font-size:10px!important;text-transform:uppercase!important;padding:4px 8px!important;box-shadow:none!important;white-space:nowrap!important}
 .leaflet-tooltip::before{border-top-color:rgba(255,180,0,.5)!important}
+.leaflet-container .leaflet-control-attribution{background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:8px;padding:0 4px;margin:0}
 </style>
 <script>
 var IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
@@ -898,7 +899,12 @@ function initRadarMap(){
   _restoreRadarUrl();
   radarMap=L.map(document.getElementById('radar-map'),{zoomControl:true,attributionControl:false,tap:false,preferCanvas:true}).setView([39.5,-98.35],4);
   radarMap.createPane('radarPane');radarMap.getPane('radarPane').style.zIndex=350;
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:12,subdomains:'abcd',detectRetina:false}).addTo(radarMap);
+  /* Esri dark-gray canvas: keyless (CARTO raster tiles now require an API key and show a watermark without one). */
+  var ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_';
+  radarMap.createPane('labelPane');radarMap.getPane('labelPane').style.zIndex=450;radarMap.getPane('labelPane').style.pointerEvents='none';
+  L.tileLayer(ESRI+'Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:12,maxNativeZoom:16,detectRetina:false,attribution:'Esri, HERE, Garmin, &copy; OpenStreetMap'}).addTo(radarMap);
+  L.tileLayer(ESRI+'Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:12,maxNativeZoom:16,detectRetina:false,pane:'labelPane'}).addTo(radarMap);
+  L.control.attribution({prefix:false,position:'bottomright'}).addTo(radarMap);
   _radarScope=(_radarLat===null)?'national':'local';
   if(_radarLat!==null)document.getElementById('radar-ph').style.display='none';
   _applyRadarProduct(true);
@@ -984,23 +990,32 @@ function _applyRadarProduct(recenter){
     _addTileChain(srcs,'ECHO TOPS // '+stTag,function(){_radarDot('#ff4444');_setRadarTs('ECHO TOPS // UNAVAILABLE');updateStatus('ECHO TOPS UNREACHABLE');});
   }
 }
-/* Animated base reflectivity loop. RainViewer first (free tier serves zoom ≤7, upscaled above);
-   falls back to IEM NEXRAD composites (now and 5–50 min ago) if RainViewer is unreachable. */
+/* Animated base reflectivity loop. IEM NEXRAD composites (now and 5–50 min ago) first: full resolution
+   and no rate limit. RainViewer is the fallback; its free tier stops at zoom 7 and allows 100 requests
+   per minute per IP, which a 13-frame loop exceeds (tiles drop out as blank rectangles). */
 function _loadRadarLoop(){
-  var seq=_radarLoadSeq;
+  var seq=_radarLoadSeq,done=false;
   updateStatus('LOADING RADAR LOOP...');
-  fetch('https://api.rainviewer.com/public/weather-maps.json').then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(data){
-    if(seq!==_radarLoadSeq)return;
-    var host=data.host||'https://tilecache.rainviewer.com';
-    var frames=((data.radar&&data.radar.past)||[]).concat((data.radar&&data.radar.nowcast)||[]);
-    if(!frames.length)throw new Error('empty');
-    _startLoop(frames.map(function(f){return{time:f.time*1000,url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maxNativeZoom:7};}),'RAINVIEWER');
-  }).catch(function(){
-    if(seq!==_radarLoadSeq)return;
+  function iem(){
+    if(done||seq!==_radarLoadSeq)return;done=true;
     var now=Date.now(),frames=[];
     for(var m=50;m>=0;m-=5){frames.push({time:now-m*60000,url:IEM_TILE+'nexrad-n0q-900913'+(m?'-m'+(m<10?'0':'')+m+'m':'')+'/{z}/{x}/{y}.png?_='+_cacheBust(),maxNativeZoom:12});}
-    _radarDot('#ffb400');_startLoop(frames,'IEM NEXRAD');
-  });
+    _startLoop(frames,'IEM NEXRAD');
+  }
+  function rainviewer(){
+    if(done||seq!==_radarLoadSeq)return;done=true;
+    fetch('https://api.rainviewer.com/public/weather-maps.json').then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(data){
+      if(seq!==_radarLoadSeq)return;
+      var host=data.host||'https://tilecache.rainviewer.com',frames=((data.radar&&data.radar.past)||[]).slice(-6);
+      if(!frames.length)throw new Error('empty');
+      _radarDot('#ffb400');
+      _startLoop(frames.map(function(f){return{time:f.time*1000,url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maxNativeZoom:7};}),'RAINVIEWER');
+    }).catch(function(){if(seq!==_radarLoadSeq)return;done=false;iem();});
+  }
+  var probe=new Image(),t=setTimeout(rainviewer,8000);
+  probe.onload=function(){clearTimeout(t);iem();};
+  probe.onerror=function(){clearTimeout(t);rainviewer();};
+  probe.src=IEM_TILE+'nexrad-n0q-900913/0/0/0.png?_='+_cacheBust();
 }
 function _startLoop(frames,src){
   _rvFrames=frames;_rvPaused=false;
@@ -1038,7 +1053,7 @@ function setRadarProduct(prod){
   if(_showStations)_renderStationMarkers();
   _syncRadarUrl();
   if(typeof switchTab==='function'&&document.getElementById('view-radar').classList.contains('active'))
-    setSys('* SYS: NOMINAL<br>* SRC: '+(prod==='bref_qcd'?'RAINVIEWER / IEM':prod==='cref_qcd'?'NOAA MRMS / IEM':'IEM NEXRAD')+'<br>* STATION: '+(_radarStation||'IDLE'));
+    setSys('* SYS: NOMINAL<br>* SRC: '+(prod==='bref_qcd'?'IEM / RAINVIEWER':prod==='cref_qcd'?'NOAA MRMS / IEM':'IEM NEXRAD')+'<br>* STATION: '+(_radarStation||'IDLE'));
 }
 function setRadarScope(scope){_radarScope=scope;_applyRadarProduct(true);}
 function handleStationSelect(stationId,stationName,lat,lon){
