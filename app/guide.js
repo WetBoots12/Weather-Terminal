@@ -22,8 +22,7 @@ var S=[ /* [title, url] */
  ['NWS La Crosse — Why Dew Point vs. Humidity','https://www.weather.gov/arx/why_dewpoint_vs_humidity'],
  ['NOAA GOES — ABI Spectral Attributes and Products','https://www.goes.noaa.gov/abispectralattributes.php'],
  ['RAMMB/CIRA — VISIT Satellite Quick Guides index','https://rammb.cira.colostate.edu/training/visit/quick_guides/'],
- ['NOAA JetStream — Radar Beams','https://www.noaa.gov/jetstream/radar-beams'],
- ['NOAA/NESDIS STAR — GOES Image Viewer (color bars and product keys)','https://www.star.nesdis.noaa.gov/GOES/']
+ ['NOAA JetStream — Radar Beams','https://www.noaa.gov/jetstream/radar-beams']
 ];
 function r(){return ' <sup class="g-ref">['+Array.prototype.join.call(arguments,',')+']</sup>';}
 
