@@ -1,0 +1,24 @@
+[package]
+name = "goes-star"
+version = "1.1.0"
+description = "GOES-STAR Command weather terminal (desktop)"
+edition = "2021"
+publish = false
+
+[lib]
+name = "goes_star_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+tauri-plugin-opener = "2.7"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

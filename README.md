@@ -1,7 +1,8 @@
 # GOES-STAR // COMMAND (Weather Terminal)
 
 Terminal-styled weather dashboard: 3D satellite globe, animated GOES imagery, NWS forecasts, and NEXRAD radar.
-Runs as a static web app (`app/`) and as an iPhone/iPad app (Capacitor wrapper in `ios/`).
+Runs as a static web app (`app/`), as an iPhone/iPad app (Capacitor wrapper in `ios/`), and as a Windows and macOS
+desktop app (Tauri wrapper in `src-tauri/`). All three load the same `app/` files.
 
 ## Install on iPhone / iPad (sideload from Windows, no Mac needed)
 
@@ -18,6 +19,29 @@ Runs as a static web app (`app/`) and as an iPhone/iPad app (Capacitor wrapper i
 With a free Apple ID the app must be re-signed every 7 days (re-run Sideloadly, or enable its auto-refresh).
 A paid Apple Developer account extends this to one year.
 
+## Install on Windows
+
+1. Open the repo's **Actions** tab → latest *Windows build* run → download the **GOES-STAR-windows** artifact and unzip it.
+2. Run `GOES-STAR_<version>_x64-setup.exe` (installs for your user, no admin needed). The `.msi` in the same
+   artifact is an alternative for machine-wide installs.
+3. The installer is unsigned, so SmartScreen shows *Windows protected your PC*: click **More info → Run anyway**.
+
+The app uses the Microsoft Edge WebView2 runtime that ships with Windows 10/11; the installer fetches it if missing.
+Links such as *View in STAR viewer* and the NWS pages open in your default browser.
+
+## Install on Mac
+
+1. Open the repo's **Actions** tab → latest *macOS build* run → download the **GOES-STAR-macOS-dmg** artifact and unzip it.
+2. Open `GOES-STAR-macOS-universal.dmg` and drag **GOES-STAR** onto **Applications**. One universal build runs on
+   Apple Silicon and Intel Macs (macOS 10.15 or later).
+3. The app is not notarized by Apple, so the first launch is blocked once:
+   - macOS 15 Sequoia and later: open the app, click **Done** on the "could not verify" dialog, then go to
+     **System Settings → Privacy & Security**, click **Open Anyway** next to GOES-STAR, and confirm.
+   - macOS 14 and earlier: Control-click the app in Applications → **Open** → **Open**.
+   - Or in Terminal: `xattr -dr com.apple.quarantine /Applications/GOES-STAR.app`
+
+Later launches open normally. Links such as *View in STAR viewer* open in your default browser.
+
 ## Run the web version
 
 ```
@@ -30,6 +54,10 @@ Deploys as-is on Vercel or Netlify (publish directory `app`).
 - `npm install` then `npm run vendor` copies Three.js, Leaflet, satellite.js and the font into `app/vendor`
   (committed, so the static site needs no build step).
 - `npx cap sync ios` copies `app/` into the iOS project. On a Mac, `npx cap open ios` opens it in Xcode.
+- Desktop: install Rust (rustup.rs), then `npm run desktop:dev` opens the app in a window and `npm run desktop:build`
+  builds installers for the current OS. Shared settings are in `src-tauri/tauri.conf.json`; per-OS settings are in
+  `src-tauri/tauri.windows.conf.json` and `src-tauri/tauri.macos.conf.json`. `npm run desktop:icons` regenerates
+  the icons from `app/icon-512.png`.
 
 ## Data sources
 
