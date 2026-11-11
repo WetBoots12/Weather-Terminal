@@ -60,7 +60,9 @@ var BANDS={
  '16':['Band 16 — CO2 Longwave 13.3 µm','Infrared band tied to mean tropospheric temperature.'+r(5),'Cloud-top heights, tropopause, ash. Strong limb cooling; mostly an ingredient for products rather than a band to view alone.'+r(6)]
 };
 
-function bandRows(keys){return keys.map(function(k){var b=BANDS[k];return '<div class="g-card"><div class="g-card-hd">'+b[0]+'</div><p><span class="g-k">WHAT IT IS</span> '+b[1]+'</p><p><span class="g-k">LOOK FOR</span> '+b[2]+'</p></div>';}).join('');}
+/* Uppercase in JS but keep the micro sign (CSS uppercase turns µm into MM) */
+function upMu(t){return t.split('µm').map(function(x){return x.toUpperCase();}).join('µm');}
+function bandRows(keys){return keys.map(function(k){var b=BANDS[k];return '<div class="g-card"><div class="g-card-hd" style="text-transform:none">'+upMu(b[0])+'</div><p><span class="g-k">WHAT IT IS</span> '+b[1]+'</p><p><span class="g-k">LOOK FOR</span> '+b[2]+'</p>'+(window.goesLegendHTML?window.goesLegendHTML(k):'')+'</div>';}).join('');}
 
 var PAGES={
  overview:{t:'OVERVIEW',h:function(){return ''+
@@ -87,7 +89,7 @@ var PAGES={
  loops:{t:'LIVE IMAGERY',h:function(){return ''+
   '<h3>HOW TO USE IT</h3>'+
   '<ol><li>Pick a <b>SATELLITE / SECTOR</b>. GOES-East covers the eastern and central U.S. and Atlantic; GOES-West covers the West, Alaska, Hawaii and the Pacific. Full Disk shows the whole hemisphere; regional sectors give more detail.</li>'+
-  '<li>Pick a <b>SPECTRAL BAND</b> or RGB composite. A short note on what it shows appears under the menu.</li>'+
+  '<li>Pick a <b>SPECTRAL BAND</b> or RGB composite. A short note on what it shows appears under the menu, and a <b>COLOR KEY</b> in the lower-left of the image explains what each color means (tap its header to hide or show it). Every band card below carries the same key.</li>'+
   '<li>Choose <b>ANIMATION FRAMES</b> and press <b>SYNC LATEST IMAGE</b>. More frames show longer trends; fewer load faster.</li>'+
   '<li>Leave <b>AUTO-REFRESH</b> on to pull new frames as scans arrive. <b>EMERGENCY SYSTEM RESET</b> clears a stuck loop.</li></ol>'+
   '<h3>WHY LOOP?</h3>'+
