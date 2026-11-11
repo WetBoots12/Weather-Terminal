@@ -1,0 +1,55 @@
+name: macOS build (universal .dmg, ad-hoc signed)
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['app/**', 'src-tauri/**', 'package*.json', 'scripts/**', '.github/workflows/macos-build.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install and vendor web app
+        run: |
+          npm ci
+          npm run vendor
+
+      - name: Build universal app and .dmg
+        run: npx tauri build --target universal-apple-darwin --bundles app,dmg
+
+      - name: Verify bundle
+        run: |
+          set -e
+          B=src-tauri/target/universal-apple-darwin/release/bundle
+          APP=$(ls -d "$B"/macos/*.app | head -1)
+          DMG=$(ls "$B"/dmg/*.dmg | head -1)
+          BIN="$APP/Contents/MacOS/$(defaults read "$PWD/$APP/Contents/Info" CFBundleExecutable)"
+          ARCHS=$(lipo -archs "$BIN"); echo "archs: $ARCHS"
+          [[ "$ARCHS" == *x86_64* && "$ARCHS" == *arm64* ]]
+          codesign --verify --verbose "$APP"
+          hdiutil verify "$DMG"
+          mkdir -p out && cp "$DMG" out/GOES-STAR-macOS-universal.dmg
+          ls -lh out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GOES-STAR-macOS-dmg
+          path: out/GOES-STAR-macOS-universal.dmg
+          retention-days: 30
