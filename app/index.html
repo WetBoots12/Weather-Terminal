@@ -175,7 +175,7 @@ option,optgroup{background:#111;color:var(--y)}
 .nws-graph-item{min-width:0}
 .nws-graph-item--wide{grid-column:1/-1}
 .nws-graph-lbl{font-size:9px;opacity:.45;margin-bottom:3px;text-transform:uppercase;letter-spacing:.07em}.nws-graph-lbl-sm{font-size:7px;opacity:.38;margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em}
-.nws-graph-svg{width:100%;height:80px;display:block;overflow:visible}
+.nws-spark{width:100%;min-height:92px}.nws-graph-svg{display:block;overflow:visible;font-family:inherit}
 .nws-graph-bar{width:100%;height:60px;display:block;overflow:visible}
 .nws-winddir-wrap{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
 .nws-wd-cell{border:1px solid rgba(255,180,0,.2);padding:4px 6px;text-align:center;min-width:48px;flex:1}
@@ -682,27 +682,40 @@ var _nwsTZ=null,_tzFmt={};
 function _tzParts(ts){var k=_nwsTZ||'';try{if(!_tzFmt[k])_tzFmt[k]=new Intl.DateTimeFormat('en-US',{timeZone:_nwsTZ||undefined,hour:'numeric',minute:'2-digit',hour12:true,weekday:'short'});var o={};_tzFmt[k].formatToParts(new Date(ts)).forEach(function(x){o[x.type]=x.value;});return o}catch(e){return null}}
 function fmtHour(ts){var o=_tzParts(ts);if(o)return o.hour+(o.minute!=='00'?':'+o.minute:'')+String(o.dayPeriod).toUpperCase();var d=new Date(ts),h=d.getHours(),m=d.getMinutes(),ampm=h>=12?'PM':'AM';h=h%12||12;return m?(h+':'+(m<10?'0':'')+m+ampm):(h+ampm);}
 function fmtDay(ts){var o=_tzParts(ts);if(o)return String(o.weekday).toUpperCase();return['SUN','MON','TUE','WED','THU','FRI','SAT'][new Date(ts).getDay()];}
-function makeSparkSVG(data,color){
+/* Charts render at the container's real pixel width (no viewBox stretching) and redraw on resize. */
+var _sparkReg=[],_sparkRO=null;
+function makeSparkSVG(data,color,opt){var id=_sparkReg.length;_sparkReg.push({data:data,color:color,opt:opt||{}});return'<div class="nws-spark" data-spark="'+id+'"></div>';}
+function drawSparks(root){if(!root)return;root.querySelectorAll('.nws-spark').forEach(function(el){var w=Math.round(el.clientWidth);if(!w||el._w===w)return;var r=_sparkReg[+el.getAttribute('data-spark')];if(!r)return;el._w=w;el.innerHTML=sparkSVG(r.data,r.color,w,r.opt);});}
+function sparkSVG(data,color,W,opt){
   var vals=[],times=[];
   if(data.length&&typeof data[0]==='object'&&'t' in data[0]){data.forEach(function(d){if(d.v!==null&&!isNaN(d.v)){vals.push(d.v);times.push(d.t);}});}
   else{vals=data.filter(function(v){return v!==null&&!isNaN(v);});}
-  if(vals.length<2)return'<svg class="nws-graph-svg"></svg>';
-  var W=300,H=80,PT=18,PB=14,PX=8,n=vals.length,mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals);if(mx===mn)mx=mn+1;var vRange=mx-mn;function fmtSparkVal(v){return vRange<3?(Math.round(v*100)/100).toFixed(2):vRange<30?(Math.round(v*10)/10).toFixed(1):String(Math.round(v));}
+  var H=opt.h||92;
+  if(vals.length<2)return'<svg class="nws-graph-svg" width="'+W+'" height="'+H+'"></svg>';
+  var PT=18,PB=16,PX=6,n=vals.length,dMn=Math.min.apply(null,vals),dMx=Math.max.apply(null,vals);
+  /* enforce a minimum y-range so near-constant series (e.g. pressure) are not exaggerated into noise or collapsed */
+  var minR=opt.minRange||1,mid=(dMn+dMx)/2,mn=dMn,mx=dMx;if(mx-mn<minR){mn=mid-minR/2;mx=mid+minR/2;}
+  var vRange=dMx-dMn,dec=opt.dec!=null?opt.dec:(vRange<3&&minR<1?2:vRange<30?1:0);function fv(v){return v.toFixed(dec);}
   var useTX=times.length>=2,tMin=useTX?times[0]:0,tMax=useTX?times[n-1]:n-1,tRange=tMax-tMin||1;
-  function px(i){return(PX+i/(n-1)*(W-2*PX)).toFixed(1);}
-  function tx(t){return(PX+(t-tMin)/tRange*(W-2*PX)).toFixed(1);}
-  function xfn(i){return useTX?tx(times[i]):px(i);}
-  function py(vv){return(PT+(1-(vv-mn)/(mx-mn))*(H-PT-PB)).toFixed(1);}
-  var area='M'+xfn(0)+','+(H-PB)+' '+vals.map(function(vv,i){return'L'+xfn(i)+','+py(vv);}).join(' ')+' L'+xfn(n-1)+','+(H-PB)+' Z';
-  var line=vals.map(function(vv,i){return(i?'L':'M')+xfn(i)+','+py(vv);}).join(' ');
-  var step=Math.max(1,Math.round(n/6)),vL='',tL='',lastDay='';
-  for(var i=0;i<n;i+=step){
-    vL+='<text x="'+xfn(i)+'" y="'+Math.max(11,parseFloat(py(vals[i]))-3)+'" text-anchor="middle" font-size="7.5" fill="'+color+'" opacity=".75">'+fmtSparkVal(vals[i])+'</text>';
-    if(useTX){var day=fmtDay(times[i]),hr=fmtHour(times[i]),lbl=(day!==lastDay?day+' ':'')+hr;lastDay=day;tL+='<text x="'+tx(times[i])+'" y="'+(H-1)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".38">'+lbl+'</text><line x1="'+tx(times[i])+'" y1="'+(H-PB)+'" x2="'+tx(times[i])+'" y2="'+(H-PB+3)+'" stroke="'+color+'" stroke-width=".6" opacity=".25"/>';}
-  }
-  var mini=vals.indexOf(Math.min.apply(null,vals)),maxi=vals.indexOf(Math.max.apply(null,vals));
-  var mmL='<text x="'+xfn(mini)+'" y="'+(parseFloat(py(mn))+12)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".4">▼'+fmtSparkVal(mn)+'</text><text x="'+xfn(maxi)+'" y="'+Math.max(10,parseFloat(py(mx))-3)+'" text-anchor="middle" font-size="6.5" fill="'+color+'" opacity=".4">▲'+fmtSparkVal(mx)+'</text>';
-  return'<svg class="nws-graph-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><path d="'+area+'" fill="'+color+'" opacity=".09"/><path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="1.5" opacity=".8"/>'+vL+tL+mmL+'</svg>';
+  function xfn(i){return PX+((useTX?times[i]:i)-tMin)/tRange*(W-2*PX);}
+  function py(v){return PT+(1-(v-mn)/(mx-mn))*(H-PT-PB);}
+  var base=H-PB,pts=vals.map(function(v,i){return xfn(i).toFixed(1)+','+py(v).toFixed(1);});
+  var line='M'+pts.join(' L'),area='M'+xfn(0).toFixed(1)+','+base+' L'+pts.join(' L')+' L'+xfn(n-1).toFixed(1)+','+base+' Z';
+  function anchor(x,half){return x<half+2?'start':x>W-half-2?'end':'middle';}
+  /* value labels: min/max first, then evenly spaced points, skipping any that would overlap */
+  var mini=vals.indexOf(dMn),maxi=vals.indexOf(dMx),placed=[],vL='',CW=6.1;
+  function addVal(i,pre){var txt=(pre||'')+fv(vals[i]),x=xfn(i),y=Math.max(10,py(vals[i])-5),w=txt.length*CW;
+    for(var k=0;k<placed.length;k++){var p=placed[k];if(Math.abs(p.x-x)<(p.w+w)/2+6&&Math.abs(p.y-y)<12)return;}
+    placed.push({x:x,y:y,w:w});var a=anchor(x,w/2);
+    vL+='<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+a+'" font-size="10" fill="'+color+'" opacity="'+(pre?'.95':'.7')+'">'+txt+'</text>';}
+  if(vRange>0){addVal(maxi,'▲');addVal(mini,'▼');}
+  var nv=Math.max(2,Math.min(8,Math.floor(W/90)));var lastTxt=null;for(var j=0;j<nv;j++){var ii=Math.round(j*(n-1)/(nv-1)),tt=fv(vals[ii]);if(tt===lastTxt&&j<nv-1)continue;lastTxt=tt;addVal(ii);}
+  /* time labels: count scales with width */
+  var tL='';
+  if(useTX){var nt=Math.max(2,Math.min(10,Math.floor(W/80))),lastDay='';
+    for(var j=0;j<nt;j++){var i=Math.round(j*(n-1)/(nt-1)),x=xfn(i),day=fmtDay(times[i]),lbl=(day!==lastDay?day+' ':'')+fmtHour(times[i]);lastDay=day;
+      tL+='<line x1="'+x.toFixed(1)+'" y1="'+base+'" x2="'+x.toFixed(1)+'" y2="'+(base+3)+'" stroke="'+color+'" stroke-width="1" opacity=".3"/><text x="'+x.toFixed(1)+'" y="'+(H-2)+'" text-anchor="'+anchor(x,lbl.length*2.8)+'" font-size="9" fill="'+color+'" opacity=".45">'+lbl+'</text>';}}
+  return'<svg class="nws-graph-svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'"><line x1="'+PX+'" y1="'+base+'" x2="'+(W-PX)+'" y2="'+base+'" stroke="'+color+'" stroke-width="1" opacity=".15"/><path d="'+area+'" fill="'+color+'" opacity=".09"/><path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round" opacity=".85"/>'+vL+tL+'</svg>';
 }
 
 function makeBarSVG(data,color){
@@ -729,7 +742,7 @@ function parseGridTS(prop,lim){
 }
 var _lastGridData=null,_lastHourly=null,_lastObsPress=null,_lastObsStation=null;
 function renderNWSGraphs(gridData,hourly,obsPress,obsStationId){
-  _lastGridData=gridData;_lastHourly=hourly;_lastObsPress=obsPress||[];_lastObsStation=obsStationId||null;
+  _sparkReg=[];_lastGridData=gridData;_lastHourly=hourly;_lastObsPress=obsPress||[];_lastObsStation=obsStationId||null;
   var imp=(_nwsUnits==='imperial'),gp=gridData?gridData.properties:null,H=48;
   function c2f_r(c){return Math.round((c*9/5+32)*10)/10;}function ms2mph(vv){return Math.round(vv*2.23694*10)/10;}function ms2kph(vv){return Math.round(vv*3.6*10)/10;}function pa2inhg(vv){return Math.round(vv*0.0002953*1000)/1000;}function pa2hpa(vv){return Math.round(vv/100*10)/10;}
   var tu=imp?'°F':'°C',wu=imp?'mph':'km/h',pu=imp?'inHg':'hPa',tempD=[],dewD=[],humD=[],cloudD=[],popD=[],wSpdD=[],wDirD=[],fcPressD=[];
@@ -753,21 +766,21 @@ function renderNWSGraphs(gridData,hourly,obsPress,obsStationId){
   var Y='#ffb400',C='#00cfff',G='#4ade80',W2='#c4b5fd',O='#fb923c',R='#f87171';
   var o='<div class="nws-graph-block"><div class="nws-section-hd fade-up" style="animation-delay:280ms">48-HR GRAPHICAL FORECAST <span style="opacity:.35;font-size:8px">— '+_nwsUnits.toUpperCase()+'</span></div>';
   if(tempD.length){o+='<div class="nws-graph-row"><div class="nws-graph-item"><div class="nws-graph-lbl">TEMPERATURE ('+tu+')</div>'+makeSparkSVG(tempD,Y)+'</div>';if(dewD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl">DEW POINT ('+tu+')</div>'+makeSparkSVG(dewD,C)+'</div>';o+='</div>';}
-  if(humD.length||cloudD.length){o+='<div class="nws-graph-row">';if(humD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl">HUMIDITY (%)</div>'+makeSparkSVG(humD,G)+'</div>';if(cloudD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl">SKY COVER (%)</div>'+makeSparkSVG(cloudD,W2)+'</div>';o+='</div>';}
-  if(popD.length){o+='<div class="nws-graph-row">';o+='<div class="nws-graph-item"><div class="nws-graph-lbl-sm">PROB. OF PRECIP. (%)</div>'+makeSparkSVG(popD,C)+'</div>';if(wSpdD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl-sm">WIND SPEED ('+wu+')</div>'+makeSparkSVG(wSpdD,O)+'</div>';o+='</div>';}
+  if(humD.length||cloudD.length){o+='<div class="nws-graph-row">';if(humD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl">HUMIDITY (%)</div>'+makeSparkSVG(humD,G,{dec:0})+'</div>';if(cloudD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl">SKY COVER (%)</div>'+makeSparkSVG(cloudD,W2,{dec:0})+'</div>';o+='</div>';}
+  if(popD.length){o+='<div class="nws-graph-row">';o+='<div class="nws-graph-item"><div class="nws-graph-lbl-sm">PROB. OF PRECIP. (%)</div>'+makeSparkSVG(popD,C,{dec:0})+'</div>';if(wSpdD.length)o+='<div class="nws-graph-item"><div class="nws-graph-lbl-sm">WIND SPEED ('+wu+')</div>'+makeSparkSVG(wSpdD,O)+'</div>';o+='</div>';}
   if(wDirD.length)o+=makeWindDirCards(wDirD,wSpdD,wu);
 
   /* Pressure graph */
   o+='<div class="nws-graph-row"><div class="nws-graph-item nws-graph-item--wide">';
   if(mergedPressD.length>=2){
     o+='<div class="nws-graph-lbl">BAROMETRIC PRESSURE — 12HR ('+pu+')</div>';
-    o+=makeSparkSVG(mergedPressD,R);
+    o+=makeSparkSVG(mergedPressD,R,{minRange:imp?0.1:3,dec:imp?2:1,h:110});
   }else{
     o+='<div class="nws-graph-lbl">BAROMETRIC PRESSURE</div><div style="font-size:9px;opacity:.3;padding:10px 0">NOT AVAILABLE — NO STATION DATA</div>';
   }
   o+='</div></div>';
 
-  o+='</div>';var gb=document.getElementById('nws-graph-section');if(gb)gb.innerHTML=o;return o;
+  o+='</div>';var gb=document.getElementById('nws-graph-section');if(gb){gb.innerHTML=o;drawSparks(gb);if(!_sparkRO&&window.ResizeObserver){_sparkRO=new ResizeObserver(function(){drawSparks(gb);});_sparkRO.observe(gb);}}return o;
 }
 
 var _lastNwsSync=0,_nwsLastQ=null,_nwsBusy=false;
