@@ -36,10 +36,10 @@ jobs:
         shell: bash
         run: |
           set -e
-          test -f app/vendor/three.min.js
+          test -f app/vendor/cesium/Cesium.js
           exe=src-tauri/target/release/goes-star.exe
           test -f "$exe"
-          grep -aq "vendor/three.min.js" "$exe"
+          grep -aq "vendor/cesium/Cesium.js" "$exe"
           grep -aq "/index.html" "$exe"
           ls -lh src-tauri/target/release/bundle/nsis/*.exe src-tauri/target/release/bundle/msi/*.msi
 
