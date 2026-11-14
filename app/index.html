@@ -105,6 +105,12 @@ option,optgroup{background:#111;color:var(--y)}
 .gl-row{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--ydim);margin-bottom:4px;cursor:pointer}
 .gl-row input{accent-color:#ffb400;margin:0}
 #glOpacity{width:100%;accent-color:#ffb400;margin:2px 0 8px}
+.gl-mode{display:flex;border:1px solid rgba(255,180,0,.5);margin-bottom:8px}
+.gl-mode button{flex:1;background:#0d0d0d;color:var(--ydim);border:none;border-right:1px solid rgba(255,180,0,.3);font-family:inherit;font-size:10px;letter-spacing:.08em;padding:6px 0;cursor:pointer}
+.gl-mode button:last-child{border-right:none}
+.gl-mode button.on{background:var(--y);color:#000;font-weight:700}
+.gl-float{position:absolute;top:12px;right:12px;z-index:15;width:210px;margin:0;box-shadow:0 0 12px rgba(0,0,0,.8)}
+.gl-float button{padding:8px 0;font-size:11px}
 .sat-lbl{position:absolute;font-size:9px;pointer-events:none;text-shadow:0 0 6px #000;z-index:10;letter-spacing:.05em}
 #sat-tip{position:absolute;background:rgba(0,0,0,.92);border:1px solid var(--y);padding:5px 10px;font-size:10px;pointer-events:none;z-index:20;display:none;line-height:1.6}
 #sat-img{max-width:100%;max-height:100%;object-fit:contain;display:none;transition:opacity .3s}
@@ -304,14 +310,20 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       <div id="glStatus" class="stat" style="font-size:9px;margin-top:-4px;margin-bottom:4px"></div>
       <button class="btn-ghost" style="margin-top:0" onclick="globeHome()">⌂ RESET VIEW</button>
       <div class="phd" style="margin-top:10px">WEATHER LAYERS</div>
-      <span class="lbl">LIVE RADAR</span>
-      <select id="glRadar" onchange="globeOpt('radar',this.value)"><option value="off">OFF</option><option value="iem">US NEXRAD (IEM, 5-MIN)</option><option value="rv">GLOBAL (RAINVIEWER)</option></select>
+      <span class="lbl">OVERLAY</span>
+      <div class="gl-mode"><button data-m="radar" onclick="globeMode('radar')">RADAR</button><button data-m="goes" onclick="globeMode('goes')">GOES</button><button data-m="off" onclick="globeMode('off')">OFF</button></div>
+      <div id="glRadarBox">
+      <span class="lbl">RADAR SOURCE</span>
+      <select id="glRadar" onchange="globeOpt('radar',this.value)"><option value="libre">GLOBAL — OPEN GOV MOSAIC (LIBREWXR)</option><option value="global">GLOBAL — RAINVIEWER</option><option value="iem">US — NOAA NEXRAD (IEM, 5-MIN)</option><option value="eccc">N. AMERICA — ECCC 1 KM (CANADA)</option></select>
       <label class="gl-row"><input type="checkbox" id="glRadarLoop" onchange="globeOpt('loop',this.checked)">ANIMATE RECENT FRAMES</label>
       <div id="glRadarInfo" class="stat" style="font-size:9px;margin-bottom:6px"></div>
-      <span class="lbl">GOES SATELLITE IMAGERY</span>
-      <select id="glGoes" onchange="globeOpt('goes',this.value)"><option value="off">OFF</option><option value="GEOCOLOR">GEOCOLOR</option><option value="13">IR — CH13 CLEAN LONGWAVE</option><option value="02">VISIBLE — CH02 RED</option><option value="09">WATER VAPOR — CH09 MID-LEVEL</option><option value="AirMass">AIRMASS RGB</option><option value="Sandwich">SANDWICH RGB</option><option value="DayNightCloudMicroCombo">DAY/NIGHT CLOUD MICRO</option></select>
+      </div>
+      <div id="glGoesBox">
+      <span class="lbl">GOES BAND</span>
+      <select id="glGoes" onchange="globeOpt('goes',this.value)"><option value="GEOCOLOR">GEOCOLOR</option><option value="13">IR — CH13 CLEAN LONGWAVE</option><option value="02">VISIBLE — CH02 RED</option><option value="09">WATER VAPOR — CH09 MID-LEVEL</option><option value="AirMass">AIRMASS RGB</option><option value="Sandwich">SANDWICH RGB</option><option value="DayNightCloudMicroCombo">DAY/NIGHT CLOUD MICRO</option></select>
       <select id="glGoesSat" onchange="globeOpt('goesSat',this.value)"><option value="both">GOES-19 EAST + GOES-18 WEST</option><option value="GOES19">GOES-19 EAST</option><option value="GOES18">GOES-18 WEST</option></select>
       <div id="glGoesInfo" class="stat" style="font-size:9px;margin-bottom:6px"></div>
+      </div>
       <span class="lbl">OVERLAY OPACITY</span>
       <input type="range" id="glOpacity" min="20" max="100" value="75" oninput="globeOpt('opacity',this.value)">
       <div class="phd" style="margin-top:10px">MAP LAYERS</div>
@@ -460,6 +472,7 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
     <div class="scanline"></div>
     <div id="view-3d" class="view">
       <div id="globe-wrap"><div id="globe-cesium"></div>
+        <div class="gl-mode gl-float" title="Switch the weather overlay"><button data-m="radar" onclick="globeMode('radar')">RADAR</button><button data-m="goes" onclick="globeMode('goes')">GOES</button><button data-m="off" onclick="globeMode('off')">OFF</button></div>
         <div id="sat-tip"></div>
       </div>
     </div>
@@ -525,7 +538,7 @@ window.addEventListener('load',function(){var v='GOES19|CONUS|1250x750#GEOCOLOR'
 function dmwAvail(){var ss=document.getElementById('sectorSel'),bs=document.getElementById('bandSel'),o=bs.querySelector('option[value="DMW"]'),off=ss.value.indexOf('|SECTOR/')>0;o.disabled=off;o.textContent='Derived Motion Winds'+(off?' (FD/CONUS only)':'');if(off&&bs.value==='DMW'){bs.value='GEOCOLOR';bs.dispatchEvent(new Event('change'));}}
 document.getElementById('sectorSel').addEventListener('change',dmwAvail);
 var nwsActive=false;
-function switchTab(t,el){document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});el.classList.add('active');document.querySelectorAll('.panel').forEach(function(p){p.classList.add('hidden')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});document.getElementById('panel-'+t).classList.remove('hidden');document.getElementById('view-'+t).classList.add('active');if(t==='3d'){setStatus('#22c55e','3D ORBITAL VIEW // REAL-TIME POSITIONING','G19: 75.2°W | G18: 137.2°W');setSys('* SYS: NOMINAL<br>* VIEW: 3D ORBITAL<br>* POSITIONING: REAL-TIME');if(globeReady)setTimeout(globeResize,30);else initGlobe()}else if(t==='loops'){if(currentImgUrl)setStatus('#22c55e','ACTIVE // '+lastSat+' — '+lastPath+' — '+lastBand,lastRes);else setStatus('#444','FEED OFFLINE // NO SIGNAL','—');setSys('* SYS: NOMINAL<br>* SRC: CDN.STAR.NESDIS.NOAA.GOV<br>* STATION: '+(currentImgUrl?'ACTIVE':'IDLE'))}else if(t==='nws'){if(!nwsActive)setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: '+(nwsActive?'ACTIVE':'IDLE'))}else if(t==='radar'){setStatus('#22c55e','RADAR // NEXRAD','—');setSys('* SYS: NOMINAL<br>* SRC: '+_radarSrcTxt()+'<br>* STATION: '+(typeof _radarStation!=='undefined'&&_radarStation?_radarStation:'IDLE'));if(!radarReady)initRadarMap();if(typeof radarMap!=='undefined'&&radarMap)setTimeout(function(){radarMap.invalidateSize();},50);_updateRadarProductUI();}document.getElementById('sys-status').parentElement.classList.remove('hidden')}
+function switchTab(t,el){if(t!=='3d'&&typeof globePause==='function')globePause(true);document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});el.classList.add('active');document.querySelectorAll('.panel').forEach(function(p){p.classList.add('hidden')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});document.getElementById('panel-'+t).classList.remove('hidden');document.getElementById('view-'+t).classList.add('active');if(t==='3d'){setStatus('#22c55e','3D ORBITAL VIEW // REAL-TIME POSITIONING','G19: 75.2°W | G18: 137.2°W');setSys('* SYS: NOMINAL<br>* VIEW: 3D ORBITAL<br>* POSITIONING: REAL-TIME');if(globeReady)globePause(false);else initGlobe()}else if(t==='loops'){if(currentImgUrl)setStatus('#22c55e','ACTIVE // '+lastSat+' — '+lastPath+' — '+lastBand,lastRes);else setStatus('#444','FEED OFFLINE // NO SIGNAL','—');setSys('* SYS: NOMINAL<br>* SRC: CDN.STAR.NESDIS.NOAA.GOV<br>* STATION: '+(currentImgUrl?'ACTIVE':'IDLE'))}else if(t==='nws'){if(!nwsActive)setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: '+(nwsActive?'ACTIVE':'IDLE'))}else if(t==='radar'){setStatus('#22c55e','RADAR // NEXRAD','—');setSys('* SYS: NOMINAL<br>* SRC: '+_radarSrcTxt()+'<br>* STATION: '+(typeof _radarStation!=='undefined'&&_radarStation?_radarStation:'IDLE'));if(!radarReady)initRadarMap();if(typeof radarMap!=='undefined'&&radarMap)setTimeout(function(){radarMap.invalidateSize();},50);_updateRadarProductUI();}document.getElementById('sys-status').parentElement.classList.remove('hidden')}
 
 
 /* LIVE IMAGERY — ANIMATED LOOP FROM NOAA CDN

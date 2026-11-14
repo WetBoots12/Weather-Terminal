@@ -2,27 +2,41 @@
    Base imagery, labels and terrain: Esri. Radar: IEM NEXRAD composite or RainViewer.
    GOES: NOAA STAR full-disk JPGs reprojected from the ABI fixed grid onto lat/lon in the browser. */
 var globeReady=false,_diskOverlayActive=false,_globeKick=function(){globeResize();};
-var _G={v:null,layers:{},radar:[],radarIdx:0,radarTimer:null,goes:[],goesUrls:[],disk:[],diskIdx:-1,ents:{},pending:null,pin:null,cone:[],lut:{},refresh:null};
+var _G={goesSeq:0,radarSeq:0,v:null,layers:{},radar:[],radarIdx:0,radarTimer:null,goes:[],goesUrls:[],disk:[],diskIdx:-1,ents:{},pending:null,pin:null,cone:[],lut:{},refresh:null};
 var _GEO_ALT=0.75*6371000,_LEO_ALT=0.2*6371000; /* stylized altitudes so orbits fit on screen, as before */
-var _gOpts={labels:true,terrain:true,grid:true,sats:true,light:false,radar:'iem',loop:false,goes:'off',goesSat:'both',opacity:75};
-try{var _gs=JSON.parse(localStorage.getItem('gs_globe')||'null');if(_gs)for(var _k in _gs)if(_k in _gOpts)_gOpts[_k]=_gs[_k];}catch(e){}
+/* mode = which weather overlay is on: 'radar' | 'goes' | 'off' (the RADAR / GOES switch) */
+var _gOpts={labels:true,terrain:true,grid:true,sats:true,light:false,mode:'radar',radar:'libre',loop:false,goes:'GEOCOLOR',goesSat:'both',opacity:75};
+try{var _gs=JSON.parse(localStorage.getItem('gs_globe')||'null');if(_gs){if(!_gs.mode)_gs.mode=(_gs.goes&&_gs.goes!=='off')?'goes':(_gs.radar==='off'?'off':'radar');
+  if(_gs.radar==='off')delete _gs.radar;if(_gs.radar==='rv')_gs.radar='global';if(_gs.goes==='off')delete _gs.goes;for(var _k in _gs)if(_k in _gOpts)_gOpts[_k]=_gs[_k];}}catch(e){}
 function _gSave(){try{localStorage.setItem('gs_globe',JSON.stringify(_gOpts));}catch(e){}}
 function _gStatus(t){var el=document.getElementById('glStatus');if(el)el.innerHTML=t;}
 function _gRender(){if(_G.v)_G.v.scene.requestRender();}
 function globeResize(){if(_G.v){_G.v.resize();_gRender();}}
 
+/* Cesium.js is ~6 MB: start loading it in the background shortly after the app opens,
+   so the 3D tab is ready by the time it is clicked. */
+var _gLoad=null;
+function _gLoadEngine(){
+  if(_gLoad)return _gLoad;
+  _gLoad=new Promise(function(ok,no){
+    if(window.Cesium)return ok();
+    window.CESIUM_BASE_URL='vendor/cesium/';
+    var css=document.createElement('link');css.rel='stylesheet';css.href='vendor/cesium/Widgets/widgets.css';document.head.appendChild(css);
+    var s=document.createElement('script');s.src='vendor/cesium/Cesium.js';s.async=true;s.onload=function(){ok();};s.onerror=function(){_gLoad=null;no();};
+    document.head.appendChild(s);
+  });
+  return _gLoad;
+}
+window.addEventListener('load',function(){setTimeout(function(){(window.requestIdleCallback||setTimeout)(function(){_gLoadEngine().catch(function(){});});},2500);});
 function initGlobe(){
   if(globeReady)return;globeReady=true;_gSyncUI();
-  if(window.Cesium){_gBuild();return;}
-  _gStatus('LOADING 3D ENGINE…');
-  window.CESIUM_BASE_URL='vendor/cesium/';
-  var css=document.createElement('link');css.rel='stylesheet';css.href='vendor/cesium/Widgets/widgets.css';document.head.appendChild(css);
-  var s=document.createElement('script');s.src='vendor/cesium/Cesium.js';
-  s.onload=_gBuild;s.onerror=function(){globeReady=false;_gStatus('<span style="color:#ff6644">3D ENGINE FAILED TO LOAD</span>');};
-  document.head.appendChild(s);
+  if(!window.Cesium)_gStatus('LOADING 3D ENGINE…');
+  _gLoadEngine().then(_gBuild,function(){globeReady=false;_gStatus('<span style="color:#ff6644">3D ENGINE FAILED TO LOAD</span>');});
 }
+/* stop the render loop while another tab is showing */
+function globePause(p){if(_G.v){_G.v.useDefaultRenderLoop=!p;if(!p)globeResize();}}
 
-function _gEsri(path,max,credit){return new Cesium.UrlTemplateImageryProvider({url:'https://server.arcgisonline.com/ArcGIS/rest/services/'+path+'/MapServer/tile/{z}/{y}/{x}',maximumLevel:max,credit:credit});}
+function _gEsri(path,max,credit,min){return new Cesium.UrlTemplateImageryProvider({url:'https://server.arcgisonline.com/ArcGIS/rest/services/'+path+'/MapServer/tile/{z}/{y}/{x}',maximumLevel:max,minimumLevel:min||0,credit:credit});}
 
 function _gBuild(){
   var C=Cesium;
@@ -30,10 +44,12 @@ function _gBuild(){
     baseLayer:new C.ImageryLayer(_gEsri('World_Imagery',18,'Imagery: Esri, Maxar, Earthstar Geographics')),
     animation:false,timeline:false,baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,
     navigationHelpButton:false,fullscreenButton:false,infoBox:false,selectionIndicator:false,
-    requestRenderMode:true,maximumRenderTimeChange:30,shouldAnimate:true
+    requestRenderMode:true,maximumRenderTimeChange:30,shouldAnimate:true,msaaSamples:1
   });
   _G.v=v;var sc=v.scene,gl=sc.globe;
-  gl.maximumScreenSpaceError=IS_TOUCH?2:1.5;gl.tileCacheSize=IS_TOUCH?100:400;
+  /* speed: default tile detail, no sibling prefetch, FXAA instead of 4x MSAA */
+  gl.maximumScreenSpaceError=IS_TOUCH?2.5:2;gl.tileCacheSize=IS_TOUCH?100:300;gl.preloadSiblings=false;gl.loadingDescendantLimit=10;
+  sc.postProcessStages.fxaa.enabled=true;if(IS_TOUCH&&window.devicePixelRatio>2)v.resolutionScale=2/window.devicePixelRatio*1;
   gl.showGroundAtmosphere=true;gl.baseColor=C.Color.fromCssColorString('#0d2d4a');
   sc.backgroundColor=C.Color.BLACK;sc.fog.enabled=true;
   var ctl=sc.screenSpaceCameraController;ctl.minimumZoomDistance=120;ctl.maximumZoomDistance=8e7;
@@ -59,7 +75,7 @@ function _gBuild(){
     var s=p&&p.id&&p.id._sat;
     if(!s){tip.style.display='none';_gHideCone();return;}
     tip.style.display='block';tip.style.left=(pos.x+16)+'px';tip.style.top=(pos.y+16)+'px';
-    tip.innerHTML='<b>'+s.title+'</b><br>'+(s.agency?'AGENCY: '+s.agency+'<br>':'')+'ORBIT: '+s.orbit+(s.orbit==='GEO'?'<br>LON: '+Math.abs(s.lon).toFixed(1)+'°'+(s.lon<0?'W':'E')+'<br>LAT: 0.0° N':'')+'<br>ALT: '+(s.orbit==='GEO'?'35,786':'~830')+' KM'+(s.primary?'<br>MODE: 6 (10-MIN FLEX)':'');
+    tip.innerHTML=_gSatTip(s);
     if(s.primary)_gShowCone(s);else _gHideCone();
   }
   v.screenSpaceEventHandler.setInputAction(function(e){var n=Date.now();if(n-lastPick<60)return;lastPick=n;pickAt(e.endPosition);},C.ScreenSpaceEventType.MOUSE_MOVE);
@@ -71,8 +87,8 @@ function _gBuild(){
   if(_G.pending){var pp=_G.pending;_G.pending=null;_gFlyTo(pp[0],pp[1],pp[2]);}
   _G.refresh=setInterval(function(){
     if(document.hidden||!_gVisible())return;
-    if(_gOpts.radar!=='off'&&Date.now()-(_G.radarAt||0)>300000)_gRadar();
-    if(_gOpts.goes!=='off'&&Date.now()-(_G.goesAt||0)>600000)_gGoes();
+    if(_gOpts.mode==='radar'&&Date.now()-(_G.radarAt||0)>300000)_gRadar();
+    if(_gOpts.mode==='goes'&&Date.now()-(_G.goesAt||0)>600000)_gGoes();
   },30000);
   setInterval(function(){if(!_gVisible()||document.hidden)return;_gUpdateLEO();_gSunInfo();_gRender();},1000);
   setInterval(function(){if(_diskOverlayActive&&_gVisible())_gDiskTick();},120);
@@ -88,7 +104,11 @@ function _gSyncUI(){
   var g=document.getElementById('glGoes');if(g)g.value=_gOpts.goes;
   var gs=document.getElementById('glGoesSat');if(gs)gs.value=_gOpts.goesSat;
   var o=document.getElementById('glOpacity');if(o)o.value=_gOpts.opacity;
+  document.querySelectorAll('.gl-mode button').forEach(function(b){b.classList.toggle('on',b.dataset.m===_gOpts.mode);});
+  var rs=document.getElementById('glRadarBox'),gb=document.getElementById('glGoesBox');
+  if(rs)rs.style.display=_gOpts.mode==='radar'?'':'none';if(gb)gb.style.display=_gOpts.mode==='goes'?'':'none';
 }
+function globeMode(m){if(m===_gOpts.mode)return;_gOpts.mode=m;_gSave();_gSyncUI();if(!_G.v)return;_gRadar();_gGoes();_gRender();}
 function globeOpt(k,val){
   _gOpts[k]=(k==='opacity')?parseInt(val):val;_gSave();if(!_G.v)return;
   if(k==='labels'){_G.layers.places.show=_G.layers.roads.show=!!val;}
@@ -106,9 +126,9 @@ function _gApplyAll(){var L=_G.layers;L.places.show=L.roads.show=_gOpts.labels;_
 function _gApplyTerrain(){if(!_G.v)return;_G.v.terrainProvider=(_gOpts.terrain&&_G.terrain)?_G.terrain:new Cesium.EllipsoidTerrainProvider();}
 function _gApplyOpacity(){
   var a=_gOpts.opacity/100;
-  _G.goes.forEach(function(l){l.alpha=_diskOverlayActive?0:a;});
-  _G.disk.forEach(function(l,i){l.alpha=(i===_G.diskIdx)?a:0;});
-  _G.radar.forEach(function(l,i){l.alpha=(i===_G.radarIdx)?Math.min(1,a+.15):0;});
+  _G.goes.forEach(function(l){l.alpha=a;l.show=!_diskOverlayActive;});
+  _G.radar.forEach(function(l,i){l.alpha=Math.min(1,a+.15);l.show=(i===_G.radarIdx);});
+  if(_diskOverlayActive)_gDiskTick(true);
 }
 function _gRaise(){/* keep labels above the weather layers */var il=_G.v.imageryLayers;il.raiseToTop(_G.layers.places);il.raiseToTop(_G.layers.roads);}
 
@@ -154,36 +174,65 @@ function _gBuildSats(){
   var C=Cesium,ds=new C.CustomDataSource('sats');_G.sats=ds;_G.v.dataSources.add(ds);
   var ring=[];for(var lo=-180;lo<=180;lo+=2)ring.push(lo,0,_GEO_ALT);
   ds.entities.add({polyline:{positions:C.Cartesian3.fromDegreesArrayHeights(ring),width:1,arcType:C.ArcType.NONE,material:C.Color.fromCssColorString('#00cfff').withAlpha(.25)}});
-  var list=[{title:'GOES-19 (EAST)',label:'G19-EAST 75.2°W',lon:-75.2,color:'#ffb400',orbit:'GEO',primary:true,agency:'NOAA'},
-            {title:'GOES-18 (WEST)',label:'G18-WEST 137.2°W',lon:-137.2,color:'#00cfff',orbit:'GEO',primary:true,agency:'NOAA'}];
-  (window._geoSatDefs||[]).forEach(function(d){list.push({title:d.name,label:d.name,lon:d.lon,color:_gHex(d.color),orbit:'GEO',agency:d.agency});});
-  (window._leoSatDefs||[]).forEach(function(d){var t=_hardcodedTLEs[d.name],sr=null;if(t&&window.satellite){try{sr=satellite.twoline2satrec(t[0],t[1]);}catch(e){}}
-    if(sr)list.push({title:d.name,label:d.name,color:_gHex(d.color),orbit:'LEO',agency:d.agency,satrec:sr,cat:d.cat});});
-  _G.leo=[];
+  /* NORAD catalog numbers so every satellite, GEO included, is placed from its current CelesTrak TLE */
+  var GEO_CAT={'METEOSAT-10':38552,'METEOSAT-12':54743,'HIMAWARI-9':41836,'GK-2A':43823,'FY-4B':48808};
+  var list=[{title:'GOES-19 (EAST)',label:'G19-EAST',lon:-75.2,color:'#ffb400',orbit:'GEO',primary:true,agency:'NOAA',cat:60133},
+            {title:'GOES-18 (WEST)',label:'G18-WEST',lon:-137.2,color:'#00cfff',orbit:'GEO',primary:true,agency:'NOAA',cat:51850}];
+  (window._geoSatDefs||[]).forEach(function(d){list.push({title:d.name,label:d.name,lon:d.lon,color:_gHex(d.color),orbit:'GEO',agency:d.agency,cat:GEO_CAT[d.name]});});
+  (window._leoSatDefs||[]).forEach(function(d){list.push({title:d.name,label:d.name,color:_gHex(d.color),orbit:'LEO',agency:d.agency,cat:d.cat,lon:0,lat:0});});
+  _G.satList=list;
   list.forEach(function(s){
-    var col=C.Color.fromCssColorString(s.color),pos=s.orbit==='GEO'?C.Cartesian3.fromDegrees(s.lon,0,_GEO_ALT):C.Cartesian3.ZERO;
-    var e=ds.entities.add({position:pos,
+    var col=C.Color.fromCssColorString(s.color),pos=C.Cartesian3.fromDegrees(s.lon||0,0,s.orbit==='GEO'?_GEO_ALT:_LEO_ALT);
+    s.ent=ds.entities.add({position:pos,show:s.orbit==='GEO',
       billboard:{image:_gSatIcon(s.color),scale:s.primary?.9:.7,scaleByDistance:new C.NearFarScalar(2e6,1.3,6e7,.55)},
-      label:{text:s.label,font:'10px "JetBrains Mono", monospace',fillColor:col,outlineColor:C.Color.BLACK,outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,
+      label:{text:s.label+(s.primary?' '+Math.abs(s.lon).toFixed(1)+'°'+(s.lon<0?'W':'E'):''),font:'10px "JetBrains Mono", monospace',fillColor:col,outlineColor:C.Color.BLACK,outlineWidth:3,style:C.LabelStyle.FILL_AND_OUTLINE,
         horizontalOrigin:C.HorizontalOrigin.LEFT,verticalOrigin:C.VerticalOrigin.CENTER,pixelOffset:new C.Cartesian2(18,0),scaleByDistance:new C.NearFarScalar(2e6,1.2,6e7,.8)}});
-    e._sat=s;s.ent=e;
-    if(s.orbit==='GEO')ds.entities.add({polyline:{positions:[pos,C.Cartesian3.fromDegrees(s.lon,0,0)],width:1,arcType:C.ArcType.NONE,material:col.withAlpha(.3)}});
-    else _G.leo.push(s);
+    s.ent._sat=s;
+    if(s.orbit==='GEO')s.tie=ds.entities.add({polyline:{positions:[pos,C.Cartesian3.fromDegrees(s.lon,0,0)],width:1,arcType:C.ArcType.NONE,material:col.withAlpha(.3)}});
   });
-  _gFetchTLEs();
+  _gLoadTLEs();
+}
+/* TLEs: one CelesTrak "weather" group request (cached 6 h in localStorage, CelesTrak asks clients not to poll faster),
+   then single-satellite requests for anything the group lacks. Without a TLE a GEO satellite stays at its nominal slot
+   and a polar orbiter is hidden rather than drawn at a made-up position. */
+var _TLE_TTL=6*3600e3;
+function _gTleCache(){try{return JSON.parse(localStorage.getItem('gs_tle')||'{}');}catch(e){return{};}}
+function _gParseTLE(txt,into,at){var l=txt.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);
+  for(var i=0;i+2<l.length+1;i++){if(l[i][0]==='1'&&l[i+1]&&l[i+1][0]==='2'){into[parseInt(l[i].slice(2,7))]={l1:l[i],l2:l[i+1],at:at};i++;}}}
+function _gApplyTLEs(c){
+  (_G.satList||[]).forEach(function(s){var t=c[s.cat];if(!t||!window.satellite)return;try{var sr=satellite.twoline2satrec(t.l1,t.l2);if(sr&&!sr.error){s.satrec=sr;s.tleAt=t.at;}}catch(e){}});
+  _gUpdateLEO();_gRender();
+}
+function _gLoadTLEs(){
+  var c=_gTleCache(),now=Date.now();_gApplyTLEs(c);
+  var stale=(_G.satList||[]).filter(function(s){return s.cat&&(!c[s.cat]||now-c[s.cat].at>_TLE_TTL);});
+  if(!stale.length)return;
+  fetch('https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&FORMAT=TLE').then(function(r){if(!r.ok)throw 0;return r.text();}).catch(function(){return'';}).then(function(txt){
+    _gParseTLE(txt,c,now);
+    var miss=stale.filter(function(s){return !c[s.cat]||c[s.cat].at!==now;});
+    return Promise.all(miss.map(function(s){return fetch('https://celestrak.org/NORAD/elements/gp.php?CATNR='+s.cat+'&FORMAT=TLE').then(function(r){return r.ok?r.text():'';}).then(function(t){_gParseTLE(t,c,now);}).catch(function(){});}));
+  }).then(function(){try{localStorage.setItem('gs_tle',JSON.stringify(c));}catch(e){}_gApplyTLEs(c);});
 }
 function _gUpdateLEO(){
-  if(!_G.leo||!window.satellite)return;var now=new Date(),gm=satellite.gstime(now);
-  _G.leo.forEach(function(s){try{var pv=satellite.propagate(s.satrec,now);if(!pv||!pv.position)return;var g=satellite.eciToGeodetic(pv.position,gm);
-    s.ent.position=Cesium.Cartesian3.fromRadians(g.longitude,g.latitude,_LEO_ALT);}catch(e){}});
-}
-function _gFetchTLEs(){
-  (_G.leo||[]).forEach(function(s){
-    fetch('https://celestrak.org/NORAD/elements/gp.php?CATNR='+s.cat+'&FORMAT=TLE').then(function(r){return r.text();}).then(function(t){
-      var l=t.trim().split('\n').map(function(x){return x.trim();});
-      if(l.length>=3){try{var sr=satellite.twoline2satrec(l[1],l[2]);if(sr)s.satrec=sr;}catch(e){}}
-    }).catch(function(){});
+  if(!_G.satList||!window.satellite)return;var C=Cesium,now=new Date(),gm=satellite.gstime(now);
+  _G.satList.forEach(function(s){
+    if(!s.satrec)return;
+    try{var pv=satellite.propagate(s.satrec,now);if(!pv||!pv.position)return;var g=satellite.eciToGeodetic(pv.position,gm);
+      s.lon=C.Math.toDegrees(C.Math.negativePiToPi(g.longitude));s.lat=C.Math.toDegrees(g.latitude);s.altKm=g.height;
+      var p=C.Cartesian3.fromRadians(g.longitude,s.orbit==='GEO'?0:g.latitude,s.orbit==='GEO'?_GEO_ALT:_LEO_ALT);s.ent.position=p;s.ent.show=true;
+      if(s.tie)s.tie.polyline.positions=[p,C.Cartesian3.fromRadians(g.longitude,0,0)];
+      if(s.primary)s.ent.label.text=s.label+' '+Math.abs(s.lon).toFixed(1)+'°'+(s.lon<0?'W':'E');
+    }catch(e){}
   });
+}
+function _gSatTip(s){
+  var ll=function(v,p,n){return Math.abs(v).toFixed(s.orbit==='GEO'?2:1)+'° '+(v<0?n:p);};
+  var age=s.tleAt?(Date.now()-s.tleAt)/36e5:null,ep=s.satrec?(Date.now()-(Date.UTC(2000+((s.satrec.epochyr|0)%100),0,1)+(s.satrec.epochdays-1)*864e5))/864e5:null;
+  return'<b>'+s.title+'</b><br>'+(s.agency?'AGENCY: '+s.agency+'<br>':'')+'ORBIT: '+(s.orbit==='GEO'?'GEOSTATIONARY':'POLAR (SUN-SYNC)')+
+    '<br>LAT: '+ll(s.lat||0,'N','S')+'<br>LON: '+ll(s.lon||0,'E','W')+
+    '<br>ALT: '+(s.altKm?Math.round(s.altKm).toLocaleString('en-US'):(s.orbit==='GEO'?'35,786':'—'))+' KM'+
+    '<br>POSITION: '+(s.satrec?'LIVE (SGP4, TLE EPOCH '+(ep!==null?ep.toFixed(1)+' D AGO':'—')+')':'NOMINAL SLOT (NO TLE)')+
+    (s.primary?'<br>MODE: 6 (10-MIN FLEX)':'');
 }
 /* field-of-view cone from a GOES satellite to the Earth's limb + true coverage circle on the ground */
 function _gShowCone(s){
@@ -235,10 +284,10 @@ function flyToNWSPin(){var lat=_pinLat,lon=_pinLon,btn=document.querySelector('.
 function _gClearRadar(){if(_G.radarTimer){clearInterval(_G.radarTimer);_G.radarTimer=null;}_G.radar.forEach(function(l){_G.v.imageryLayers.remove(l,true);});_G.radar=[];_G.radarIdx=0;}
 function _gRadar(){
   if(!_G.v)return;_gClearRadar();_G.radarAt=Date.now();var C=Cesium,seq=_G.radarSeq=(_G.radarSeq||0)+1;
-  if(_gOpts.radar==='off'){_gRadarInfo('');_gRender();return;}
+  if(_gOpts.mode!=='radar'){_gRadarInfo('');_gRender();return;}
   function add(frames,src){
     if(seq!==_G.radarSeq)return;
-    _G.radar=frames.map(function(f){var l=_G.v.imageryLayers.addImageryProvider(f.p);l.alpha=0;return l;});
+    _G.radar=frames.map(function(f){var l=_G.v.imageryLayers.addImageryProvider(f.p);l.show=false;return l;});
     _G.radarTimes=frames.map(function(f){return f.t;});_G.radarIdx=frames.length-1;_gApplyOpacity();_gRaise();
     var info=function(){_gRadarInfo(src+' // '+new Date(_G.radarTimes[_G.radarIdx]).toISOString().slice(11,16)+' UTC');};info();
     if(frames.length>1){var dwell=0;_G.radarTimer=setInterval(function(){if(!_gVisible())return;if(_G.radarIdx===frames.length-1&&dwell++<3)return;dwell=0;_G.radarIdx=(_G.radarIdx+1)%frames.length;_gApplyOpacity();info();_gRender();},500);}
@@ -249,11 +298,27 @@ function _gRadar(){
     var rect=C.Rectangle.fromDegrees(-127,21,-64,51),fr=[];
     for(var m=_gOpts.loop?50:0;m>=0;m-=5)fr.push({t:Date.now()-m*60000,p:new C.UrlTemplateImageryProvider({url:IEM_TILE+'nexrad-n0q-900913'+(m?'-m'+(m<10?'0':'')+m+'m':'')+'/{z}/{x}/{y}.png?_='+bust,maximumLevel:10,rectangle:rect,credit:'Radar: NOAA NEXRAD via Iowa Environmental Mesonet'})});
     add(fr,'US NEXRAD');
+  }else if(_gOpts.radar==='eccc'){
+    /* MSC GeoMet (Environment and Climate Change Canada): 1 km North American composite, rain rate, 6-min, open data, no key */
+    var fr2=[],step=_gOpts.loop?6:0,base=Math.floor((Date.now()-6*60000)/360000)*360000;
+    for(var k=_gOpts.loop?8:0;k>=0;k--){var tt=base-k*step*60000;
+      fr2.push({t:tt,p:new C.WebMapServiceImageryProvider({url:'https://geo.weather.gc.ca/geomet',layers:'RADAR_1KM_RRAI',rectangle:C.Rectangle.fromDegrees(-170,15,-45,85),maximumLevel:9,
+        parameters:Object.assign({transparent:true,format:'image/png',version:'1.3.0'},_gOpts.loop?{time:new Date(tt).toISOString().slice(0,19)+'Z'}:{}),credit:'Radar: Environment and Climate Change Canada (MSC GeoMet)'})});}
+    add(fr2,'N. AMERICA (ECCC)');
   }else{
-    fetch('https://api.rainviewer.com/public/weather-maps.json').then(function(r){return r.json();}).then(function(d){
-      var host=d.host||'https://tilecache.rainviewer.com',past=((d.radar&&d.radar.past)||[]).slice(_gOpts.loop?-6:-1);
-      add(past.map(function(f){return{t:f.time*1000,p:new C.UrlTemplateImageryProvider({url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maximumLevel:7,credit:'Radar: RainViewer'})};}),'GLOBAL RADAR');
-    }).catch(function(){if(seq===_G.radarSeq)_gRadarInfo('<span style="color:#ff6644">RAINVIEWER UNREACHABLE</span>');});
+    /* 'libre': LibreWXR open mosaic built only from government radar (NOAA MRMS, ECCC, EUMETNET OPERA, JMA, CWA, ...),
+       same JSON/tile format as RainViewer. Falls back to RainViewer if it is unreachable. 'global': RainViewer directly. */
+    var srcs=_gOpts.radar==='libre'?[['https://api.librewxr.net/public/weather-maps.json','OPEN GOV MOSAIC (LIBREWXR)','Radar: LibreWXR (government open data, CC BY 4.0)',8],
+      ['https://api.rainviewer.com/public/weather-maps.json','GLOBAL (RAINVIEWER FALLBACK)','Radar: RainViewer',7]]:[['https://api.rainviewer.com/public/weather-maps.json','GLOBAL (RAINVIEWER)','Radar: RainViewer',7]];
+    (function tryNext(i){
+      if(i>=srcs.length){if(seq===_G.radarSeq)_gRadarInfo('<span style="color:#ff6644">GLOBAL RADAR UNREACHABLE</span>');return;}
+      var sc=srcs[i];
+      fetch(sc[0]).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){
+        var past=((d.radar&&d.radar.past)||[]).slice(_gOpts.loop?-6:-1);if(!past.length)throw 0;
+        var host=d.host||(sc[0].indexOf('rainviewer')>0?'https://tilecache.rainviewer.com':sc[0].replace(/\/public\/weather-maps\.json$/,''));
+        add(past.map(function(f){return{t:f.time*1000,p:new C.UrlTemplateImageryProvider({url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maximumLevel:sc[3],credit:sc[2]})};}),sc[1]);
+      }).catch(function(){if(seq===_G.radarSeq)tryNext(i+1);});
+    })(0);
   }
 }
 function _gRadarInfo(t){var el=document.getElementById('glRadarInfo');if(el)el.innerHTML=t;}
@@ -262,9 +327,9 @@ function _gRadarInfo(t){var el=document.getElementById('glRadarInfo');if(el)el.i
    Fixed-grid → geodetic per the GOES-R PUG (vol. 4, 4.2.8). STAR full-disk JPGs span ±0.151872 rad scan angle. */
 var _ABI={H:42164160,req:6378137,rpol:6356752.31414,e2:0.0066943800699785,XM:0.151872};
 function _gPieces(lon0){var a=lon0-81,b=lon0+81,out=[];if(a<-180){out.push([a+360,180]);a=-180;}if(b>180){out.push([-180,b-360]);b=180;}out.unshift([a,b]);return out;}
-/* lookup table: output pixel → source pixel index (or -1) + alpha */
-function _gLut(lon0,W,piece,res,cut){
-  var key=[lon0,W,piece[0],piece[1],res,cut].join('|');if(_G.lut[key])return _G.lut[key];
+/* lookup table: output pixel → source pixel index (or -1) + alpha. Pure, so it also runs inside the worker. */
+function _gLutCore(lon0,W,piece,res,cut,cache){
+  var key=[lon0,W,piece[0],piece[1],res,cut].join('|');if(cache[key])return cache[key];
   var A=_ABI,ow=Math.round((piece[1]-piece[0])/res),oh=Math.round(162/res),idx=new Int32Array(ow*oh),al=new Uint8Array(ow*oh),l0=lon0*Math.PI/180,k=0,rr=(A.rpol*A.rpol)/(A.req*A.req);
   for(var j=0;j<oh;j++){var lat=(81-(j+.5)*res)*Math.PI/180,pc=Math.atan(rr*Math.tan(lat)),cp=Math.cos(pc),rc=A.rpol/Math.sqrt(1-A.e2*cp*cp);
     for(var i=0;i<ow;i++,k++){
@@ -276,18 +341,39 @@ function _gLut(lon0,W,piece,res,cut){
       if(u<0||v<0||u>=W||v>=W){idx[k]=-1;continue;}
       idx[k]=v*W+u;al[k]=vis>.3?255:Math.round((vis-.16)/.14*255);
     }}
-  return(_G.lut[key]={idx:idx,al:al,w:ow,h:oh});
+  return(cache[key]={idx:idx,al:al,w:ow,h:oh});
 }
-/* returns a promise of [{url,rect}] blob images for one FD image */
+function _gFillCore(src,L,d){for(var k=0,n=L.w*L.h;k<n;k++){var s=L.idx[k];if(s<0)continue;s<<=2;var q=k<<2;d[q]=src[s];d[q+1]=src[s+1];d[q+2]=src[s+2];d[q+3]=L.al[k];}}
+function _gRes(W){return W>=5000?.06:.1;}
+/* Reprojection worker: keeps the 5424² decode, per-pixel remap and PNG encode off the UI thread. */
+var _gW=null,_gWseq=0,_gWcb={};
+function _gWorker(){
+  if(_gW!==null)return _gW;_gW=false;
+  try{
+    if(typeof OffscreenCanvas==='undefined'||typeof createImageBitmap==='undefined')return _gW;
+    var code='var _ABI='+JSON.stringify(_ABI)+';'+_gPieces+_gLutCore+_gFillCore+_gRes+'var cache={};onmessage=async function(e){var m=e.data;try{var W=m.bmp.width,c=new OffscreenCanvas(W,W),x=c.getContext("2d",{willReadFrequently:true});x.drawImage(m.bmp,0,0);m.bmp.close();var src=x.getImageData(0,0,W,W).data,out=[],ps=_gPieces(m.lon0);for(var i=0;i<ps.length;i++){var L=_gLutCore(m.lon0,W,ps[i],_gRes(W),m.cut,cache),o=new OffscreenCanvas(L.w,L.h),ox=o.getContext("2d"),id=ox.createImageData(L.w,L.h);_gFillCore(src,L,id.data);ox.putImageData(id,0,0);out.push({blob:await o.convertToBlob({type:"image/png"}),w:L.w,h:L.h,pc:ps[i]});}postMessage({id:m.id,out:out});}catch(err){postMessage({id:m.id,err:String(err)});}};';
+    var w=new Worker(URL.createObjectURL(new Blob([code],{type:'text/javascript'})));
+    w.onmessage=function(e){var cb=_gWcb[e.data.id];delete _gWcb[e.data.id];if(cb)cb(e.data);};
+    w.onerror=function(){_gW=false;Object.keys(_gWcb).forEach(function(k){_gWcb[k]({err:'worker'});delete _gWcb[k];});};
+    _gW=w;
+  }catch(e){_gW=false;}
+  return _gW;
+}
+function _gPiece(blob,w,h,pc){return{url:URL.createObjectURL(blob),w:w,h:h,rect:Cesium.Rectangle.fromDegrees(pc[0],-81,pc[1],81)};}
+/* returns a promise of [{url,w,h,rect}] blob images for one FD image */
 function _gReproject(img,lon0,cut){
+  var w=_gWorker();
+  if(w)return createImageBitmap(img).then(function(bmp){return new Promise(function(ok){var id=++_gWseq;_gWcb[id]=ok;w.postMessage({id:id,bmp:bmp,lon0:lon0,cut:cut},[bmp]);});})
+    .then(function(r){if(r.err)return _gReprojectMain(img,lon0,cut);return r.out.map(function(p){return _gPiece(p.blob,p.w,p.h,p.pc);});});
+  return _gReprojectMain(img,lon0,cut);
+}
+function _gReprojectMain(img,lon0,cut){
   var W=img.naturalWidth,cv=document.createElement('canvas');cv.width=cv.height=W;var cx=cv.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0);
   var src;try{src=cx.getImageData(0,0,W,W).data;}catch(e){return Promise.reject(e);}
-  var res=W>=5000?.06:.1;
   return Promise.all(_gPieces(lon0).map(function(pc){
-    var L=_gLut(lon0,W,pc,res,cut),o=document.createElement('canvas');o.width=L.w;o.height=L.h;var ox=o.getContext('2d'),id=ox.createImageData(L.w,L.h),d=id.data;
-    for(var k=0,n=L.w*L.h;k<n;k++){var s=L.idx[k];if(s<0)continue;s<<=2;var q=k<<2;d[q]=src[s];d[q+1]=src[s+1];d[q+2]=src[s+2];d[q+3]=L.al[k];}
-    ox.putImageData(id,0,0);
-    return new Promise(function(res2){o.toBlob(function(b){res2({url:URL.createObjectURL(b),w:L.w,h:L.h,rect:Cesium.Rectangle.fromDegrees(pc[0],-81,pc[1],81)});},'image/png');});
+    var L=_gLutCore(lon0,W,pc,_gRes(W),cut,_G.lut),o=document.createElement('canvas');o.width=L.w;o.height=L.h;var ox=o.getContext('2d'),id=ox.createImageData(L.w,L.h);
+    _gFillCore(src,L,id.data);ox.putImageData(id,0,0);
+    return new Promise(function(ok){o.toBlob(function(b){ok(_gPiece(b,L.w,L.h,pc));},'image/png');});
   }));
 }
 function _gAddImgs(pieces,credit){return pieces.map(function(p){_G.goesUrls.push(p.url);return _G.v.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({url:p.url,rectangle:p.rect,tileWidth:p.w,tileHeight:p.h,credit:credit}));});}
@@ -295,7 +381,7 @@ function _gLoadImg(url){return new Promise(function(ok,no){var im=new Image();im
 function _gClearGoes(){_G.goes.forEach(function(l){_G.v.imageryLayers.remove(l,true);});_G.goes=[];}
 function _gGoes(){
   if(!_G.v)return;var seq=_G.goesSeq=(_G.goesSeq||0)+1;_G.goesAt=Date.now();
-  if(_gOpts.goes==='off'){_gClearGoes();_gGoesInfo('');_gRender();return;}
+  if(_gOpts.mode!=='goes'){_G.goesSeq++;_gClearGoes();_gGoesInfo('');_gRender();return;}
   var band=_gOpts.goes,size=IS_TOUCH?'1808x1808':'5424x5424',sats=_gOpts.goesSat==='both'?['GOES18','GOES19']:[_gOpts.goesSat],bust=Math.floor(Date.now()/600000);
   _gGoesInfo('LOADING GOES '+band+'…');
   Promise.all(sats.map(function(s){
@@ -343,7 +429,7 @@ function refreshDiskTextures(force){
 function _gDiskTick(force){
   if(!_diskOverlayActive||!_G.diskFrames||!_G.diskFrames.length)return;
   var f=animIdx%_G.diskFrames.length;if(f===_G.diskFrameShown&&!force)return;_G.diskFrameShown=f;
-  var a=_gOpts.opacity/100;_G.goes.forEach(function(l){l.alpha=0;});
-  _G.diskFrames.forEach(function(pcs,i){pcs.forEach(function(l){l.alpha=i===f?a:0;});});_gRender();
+  var a=_gOpts.opacity/100;_G.goes.forEach(function(l){l.show=false;});
+  _G.diskFrames.forEach(function(pcs,i){pcs.forEach(function(l){l.alpha=a;l.show=(i===f);});});_gRender();
 }
 function updateDiskTexBtn(){var btn=document.getElementById('diskTexBtn'),st=document.getElementById('diskTexStatus');if(!btn)return;var ok=lastPath==='FD'&&(animFrames.length>0||!!currentImgUrl);btn.style.display=ok?'block':'none';if(st)st.style.display=ok?'none':'block';}
