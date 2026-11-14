@@ -183,3 +183,16 @@
 [data-ui=b] .guide-btn{border:none;border-radius:7px;color:var(--mut);font-family:var(--fui);font-weight:600}
 [data-ui=b] .guide-btn:hover,[data-ui=a] .guide-btn:hover{color:var(--fg)}
 [data-ui=b] .sb-more>summary{color:var(--fg)}
+
+/* shared time sliders (.tsl: radar, globe GOES, Live Imagery) match the NWS hour slider */
+.tsl input[type=range]{-webkit-appearance:none;appearance:none;height:20px;background:transparent}
+.tsl input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--line)}
+.tsl input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line)}.tsl input[type=range]::-moz-range-progress{height:4px;background:var(--acc)}
+.tsl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--acc);border:3px solid #000;margin-top:-5px;box-shadow:0 0 0 1px var(--acc)}
+.tsl input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:var(--acc);border:3px solid #000}
+.tsl{font-family:var(--fnum)}
+.tsl button{border-radius:var(--r)}
+[data-ui=b] .tsl{background:rgba(21,21,22,.94);border-color:var(--line);border-radius:var(--r);color:var(--fg)}
+[data-ui=b] .tsl button{border-color:var(--line);color:var(--fg)}
+[data-ui=c] .tsl{background:rgba(0,0,0,.75);border:none;border-radius:var(--r);color:var(--mut)}
+[data-ui=c] .tsl button{border:none;color:var(--acc)}
