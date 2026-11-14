@@ -1,4 +1,4 @@
-const CACHE = 'goes-star-v9';
+const CACHE = 'goes-star-v10';
 const ASSETS = [
   './index.html',
   './guide.js',

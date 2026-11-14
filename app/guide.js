@@ -28,7 +28,15 @@ var S=[ /* [title, url] */
  ['NWS Jackson, MS — Dual-Pol Radar Products','https://www.weather.gov/jan/dualpolupgrade-products'],
  ['NOAA WDTD — MRMS QPE, Radar Only','https://vlab.noaa.gov/web/wdtd/-/qpe-radar-only'],
  ['NOAA GSL — High-Resolution Rapid Refresh (HRRR)','https://rapidrefresh.noaa.gov/hrrr/'],
- ['Iowa Environmental Mesonet — OGC / Tile Map Services','https://mesonet.agron.iastate.edu/ogc/']
+ ['Iowa Environmental Mesonet — OGC / Tile Map Services','https://mesonet.agron.iastate.edu/ogc/'],
+ ['NWS Detroit/Pontiac — Watch, Warning, and Advisory Definitions','https://www.weather.gov/dtx/wwa_defs'],
+ ['NWS Binghamton — Forecast Terms','https://www.weather.gov/bgm/forecast_terms'],
+ ['NWS — Glossary','https://forecast.weather.gov/glossary.php'],
+ ['NWS — API Web Service documentation','https://www.weather.gov/documentation/services-web-api'],
+ ['NOAA NCEI — Next Generation Weather Radar (NEXRAD)','https://www.ncei.noaa.gov/products/radar/next-generation-weather-radar'],
+ ['NOAA GOES-R — ABI Scan Mode Information','https://www.goes-r.gov/users/abiScanModeInfo.html'],
+ ['NOAA/NWS — National Hurricane Center','https://www.nhc.noaa.gov/'],
+ ['NOAA/NWS — Storm Prediction Center','https://www.spc.noaa.gov/']
 ];
 function r(){return ' <sup class="g-ref">['+Array.prototype.join.call(arguments,',')+']</sup>';}
 
@@ -62,18 +70,50 @@ var BANDS={
 
 /* Uppercase in JS but keep the micro sign (CSS uppercase turns µm into MM) */
 function upMu(t){return t.split('µm').map(function(x){return x.toUpperCase();}).join('µm');}
+/* Glossary: [term, definition] (NWS Glossary [28] unless a ref is given) */
+var G=[
+ ['Advisory','Issued when a hazardous event is occurring or very likely and will cause significant inconvenience.'+r(26)],
+ ['Brightness temperature','The temperature an infrared satellite band reads for whatever it sees: a cloud top, or the ground in clear air. Not the air temperature at the surface.'+r(6)],
+ ['Dew point','The temperature to which air must be cooled to reach saturation. A higher dew point means more moisture in the air.'],
+ ['dBZ','The unit of radar reflectivity: a logarithmic (decibel) ratio of the power returned. Higher dBZ means heavier precipitation or hail.'],
+ ['Doppler radar','Radar that measures radial velocity: the part of the motion toward or away from the radar.'],
+ ['Enhanced V','A V-shaped area of colder cloud tops extending downwind from a thunderstorm on infrared imagery. It indicates a very strong updraft and a higher potential for severe weather.'],
+ ['Geostationary satellite','A satellite that orbits at the same rate the Earth turns, so it stays over the same spot above the equator. GOES-18 and GOES-19 are geostationary.'],
+ ['Gust','A rapid fluctuation of wind speed, with peaks and lulls differing by 10 knots or more.'],
+ ['HRRR','High-Resolution Rapid Refresh: a 3 km, hourly updated, storm-resolving NOAA forecast model that assimilates radar data. It drives FUTURE RADAR.'],
+ ['Knot (kt)','One nautical mile per hour: about 1.15 mph or 0.5 m/s.'],
+ ['Millibar (mb) / hectopascal (hPa)','Units of air pressure; 1 mb = 1 hPa. Standard sea-level pressure is 1013.25 mb (29.92 inHg).'+r(15)],
+ ['Outlook','Gives lead time that a hazardous event may develop in the next 7 days.'+r(26)],
+ ['Precipitable water','The depth of water that would result if all the water vapor in a column of air fell out as precipitation.'],
+ ['Probability of precipitation (PoP)','The chance that at least 0.01 in of precipitation falls at any given point in the forecast area during the period.'+r(27)],
+ ['Relative humidity','The moisture in the air as a percent of what it could hold at that temperature. It changes with temperature, so it does not by itself show how much moisture is present.'],
+ ['RGB composite','A satellite image that assigns different bands, or band differences, to the red, green and blue colors so features stand out by color.'+r(18)],
+ ['UTC / Z (Zulu) time','The time at the prime meridian in Greenwich, England, formerly called GMT. Satellite and radar data are stamped in UTC.'],
+ ['Warning','Issued when a hazardous event is occurring or very likely and threatens life or property.'+r(26)],
+ ['Watch','Issued when the risk of a hazardous event has increased significantly, but its occurrence, location or timing is still uncertain.'+r(26)]
+];
 function bandRows(keys){return keys.map(function(k){var b=BANDS[k];return '<div class="g-card"><div class="g-card-hd" style="text-transform:none">'+upMu(b[0])+'</div><p><span class="g-k">WHAT IT IS</span> '+b[1]+'</p><p><span class="g-k">LOOK FOR</span> '+b[2]+'</p>'+(window.goesLegendHTML?window.goesLegendHTML(k):'')+'</div>';}).join('');}
 
 var PAGES={
  overview:{t:'OVERVIEW',h:function(){return ''+
   '<h3>HOW THE TERMINAL IS ORGANIZED</h3>'+
   '<p>Each tab along the top is a separate instrument. The <b>sidebar</b> (☰ on a phone) holds that tab\'s controls, the large area on the right is the display, and the <b>status bar</b> under the header shows the feed state and source. The clock runs in UTC because satellite and radar timestamps are in UTC.</p>'+
+  '<h3>WHAT EACH TOOL IS FOR</h3>'+
+  '<table class="g-tbl"><tr><th>TAB</th><th>USE IT FOR</th><th>DATA COMES FROM</th></tr>'+
+  '<tr><td><b>NWS GROUND</b></td><td>Your official forecast and any watches, warnings or advisories for your spot</td><td>Your local NWS Weather Forecast Office, through api.weather.gov'+r(29)+'</td></tr>'+
+  '<tr><td><b>RADAR</b></td><td>Where precipitation is falling right now, how hard, how it is moving, and whether storms are rotating</td><td>NEXRAD, a network of 160 Doppler radars run by NWS, FAA and the Air Force'+r(30)+'</td></tr>'+
+  '<tr><td><b>LIVE IMAGERY</b></td><td>Clouds, moisture, jet streams, storm tops, smoke, fire and lightning over the whole region</td><td>GOES-19 (East) and GOES-18 (West) via NOAA/NESDIS STAR'+r(17)+'</td></tr>'+
+  '<tr><td><b>3D ORBITAL</b></td><td>Which satellites are watching where, day and night, and when the next scan arrives</td><td>NOAA GOES-R and JPSS programs'+r(14,31)+'</td></tr></table>'+
   '<h3>A TYPICAL WORKFLOW</h3>'+
   '<ol><li><b>NWS GROUND</b> — search your location first. Read any alerts, then the forecast. This also sets the location the Radar tab centers on.</li>'+
   '<li><b>LIVE IMAGERY</b> — look at the big picture: where the clouds, jet stream and storms are, and how they are moving.</li>'+
   '<li><b>RADAR</b> — zoom in on precipitation and storm structure near you.</li>'+
   '<li><b>3D ORBITAL</b> — see which satellites are looking where, where it is day or night, and when the next scan arrives.</li></ol>'+
   '<p>Forecasters do not trust one product alone. NWS warning guidance stresses that no single radar indicator is used by itself to issue a warning.'+r(3)+' Cross-check satellite, radar and observations before drawing a conclusion.</p>'+
+  '<h3>TIME AND UNITS</h3>'+
+  '<p>The header clock and all satellite and radar timestamps are <b>UTC</b>, also written <b>Z</b> or "Zulu": the time at the prime meridian, formerly called GMT.'+r(28)+' Subtract 5 hours for Eastern Standard Time (4 during daylight time), 6 for Central, 7 for Mountain, 8 for Pacific. Forecast times on NWS GROUND are already in the location\'s local time. Radar wind speeds are in <b>knots</b> (1 kt ≈ 1.15 mph).'+r(28)+' The GLOSSARY page defines the other terms.</p>'+
+  '<h3>OFFICIAL WARNINGS</h3>'+
+  '<p>This terminal displays NOAA and NWS data, but it is not an official alerting service and it can lag or fail to load. When severe weather threatens, follow warnings from your local NWS office through NOAA Weather Radio, Wireless Emergency Alerts on your phone, or weather.gov.</p>'+
   '<p class="g-dim">Every tab has a <b>? HOW TO USE</b> link in its sidebar that opens this manual at the right page. Bracketed numbers point to the SOURCES page.</p>';}},
  '3d':{t:'3D ORBITAL',h:function(){return ''+
   '<h3>WHAT YOU ARE LOOKING AT</h3>'+
@@ -81,12 +121,15 @@ var PAGES={
   '<h3>HOW TO USE IT</h3>'+
   '<ul><li><b>Drag</b> to rotate, <b>scroll or pinch</b> to zoom, <b>hover or tap</b> a satellite for its name and position.</li>'+
   '<li>The shaded <b>terminator</b> marks day and night. Visible bands, GeoColor\'s true-color mode, Sandwich and the Day Cloud Phase half of the Cloud Micro Combo only work on the sunlit side.</li>'+
-  '<li><b>SCAN SCHEDULE</b> counts down to the next Full Disk (10 min), CONUS/PACUS (5 min) and Mesoscale (1 min) scan. Imagery appears a few minutes after a scan completes, so syncing right at zero may return the previous frame.</li>'+
+  '<li><b>SCAN SCHEDULE</b> counts down to the next Full Disk (10 min), CONUS/PACUS (5 min) and Mesoscale (1 min) scan; this is ABI Scan Mode 6, which GOES flies by default.'+r(31)+' Imagery appears a few minutes after a scan completes, so syncing right at zero may return the previous frame.</li>'+
   '<li><b>OVERLAY DISK</b>: load a Full Disk on Live Imagery, come back here, and drape the latest image on the globe.</li>'+
   '<li><b>VIEW ON GLOBE</b> (NWS Ground) drops a red pin at your forecast location.</li></ul>'+
   '<h3>WHAT TO KEEP IN MIND</h3>'+
   '<p>Geostationary satellites see high latitudes and the disk edge at a steep slant. Features there are stretched, and infrared and water-vapor bands read colder near the edge (limb cooling), up to several degrees.'+r(6,8)+' Lightning and cloud-top features are displaced from their true ground position by parallax, so they will not line up exactly with radar.'+r(13)+'</p>';}},
  loops:{t:'LIVE IMAGERY',h:function(){return ''+
+  '<h3>WHAT IT IS FOR</h3>'+
+  '<p>The Advanced Baseline Imager (ABI) on each GOES satellite measures 16 wavelengths. Visible and near-infrared bands (1-6) see reflected sunlight, so they show cloud texture and smoke by day. Infrared bands (7-16) measure heat given off, so they work day and night and give cloud-top temperature; colder tops are higher tops. Water-vapor bands (8-10) show moisture in the middle and upper atmosphere even where there is no cloud.'+r(5,17)+' RGB composites combine several bands so one image separates features such as fog, dust or dry stratospheric air.'+r(18)+'</p>'+
+  '<p>In Scan Mode 6 the full disk is imaged every 10 minutes, CONUS/PACUS every 5 minutes, and each of the two mesoscale sectors every minute.'+r(31)+'</p>'+
   '<h3>HOW TO USE IT</h3>'+
   '<ol><li>Pick a <b>SATELLITE / SECTOR</b>. GOES-East covers the eastern and central U.S. and Atlantic; GOES-West covers the West, Alaska, Hawaii and the Pacific. Full Disk shows the whole hemisphere; regional sectors give more detail.</li>'+
   '<li>Pick a <b>SPECTRAL BAND</b> or RGB composite. A short note on what it shows appears under the menu, and a <b>COLOR KEY</b> in the lower-left of the image explains what each color means (tap its header to hide or show it). Every band card below carries the same key.</li>'+
@@ -107,22 +150,56 @@ var PAGES={
   '<h3>THE 16 ABI BANDS</h3><p class="g-dim">Bands 1-6 measure reflected sunlight (daytime only). Bands 7-16 measure infrared emission and work day and night: 8-10 show water vapor at three heights; 13-15 are "window" bands that see cloud tops or the ground.'+r(5)+'</p>'+
   bandRows(['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16']);}},
  nws:{t:'NWS GROUND',h:function(){return ''+
+  '<h3>WHAT IT IS FOR</h3>'+
+  '<p>This tab shows the official forecast for the spot you search, written by the forecasters at your local NWS Weather Forecast Office. The app looks the location up on api.weather.gov, which returns that office\'s forecast grid: twelve-hour periods for seven days (the 7-DAY cards), hourly periods (the 48-HOUR OUTLOOK) and the raw forecast values behind the graphs.'+r(29)+' Active alerts for the point come from the same service.</p>'+
   '<h3>HOW TO USE IT</h3>'+
   '<ol><li>Type a ZIP code, city or state, pick a match, and press <b>ACQUIRE FORECAST</b>. U.S. locations only (data from api.weather.gov).</li>'+
   '<li>Use <b>IMPERIAL / METRIC</b> to switch units. <b>AUTO-REFRESH</b> keeps the data current; <b>CLEAR STATION</b> resets.</li>'+
   '<li><b>Tap</b> the current-conditions box, any hourly or 7-day card, or an alert to expand the full text.</li>'+
-  '<li>The location you pick also centers the <b>RADAR</b> tab and can be pinned on the 3D globe.</li></ol>'+
+  '<li>The location you pick also centers the <b>RADAR</b> tab and can be pinned on the 3D globe.</li>'+
+  '<li>The links under the forecast open NWS pages for the same point: <b>FORECAST ↗</b> (the weather.gov point forecast), <b>NWS CHART ↗</b> (the hourly weather graph), <b>RADAR ↗</b> (radar.weather.gov) and <b>NHC ↗</b> (the National Hurricane Center, for tropical storms and hurricanes).'+r(32)+'</li></ol>'+
+  '<h3>WATCH, WARNING OR ADVISORY?</h3>'+
+  '<table class="g-tbl"><tr><th>TERM</th><th>NWS DEFINITION</th><th>WHAT TO DO</th></tr>'+
+  '<tr><td><b>Outlook</b></td><td>A hazardous event may develop in the next 7 days</td><td>Stay aware; check back</td></tr>'+
+  '<tr><td><b>Watch</b></td><td>The risk has increased significantly, but occurrence, location or timing is still uncertain</td><td>Be prepared; set your plans in motion</td></tr>'+
+  '<tr><td><b>Warning</b></td><td>The hazard is occurring or very likely, and threatens life or property</td><td>Take protective action now</td></tr>'+
+  '<tr><td><b>Advisory</b></td><td>The hazard is occurring or very likely and will cause significant inconvenience</td><td>Use caution</td></tr></table>'+
+  '<p>A Severe Thunderstorm Warning means winds of 58 mph (50 kt) or more and/or hail 1 inch or larger; a Tornado Warning means a tornado is occurring or developing. Tornado and Severe Thunderstorm <i>Watches</i> are issued by the Storm Prediction Center for areas at risk over the next several hours; <i>warnings</i> come from your local office.'+r(26,33)+' The "What to do" column is general guidance; always follow the instructions in the alert text.</p>'+
+  '<h3>READING FORECAST WORDS</h3>'+
+  '<p><b>Chance of precipitation</b> (the % in the forecast) is the probability that at least 0.01 in of rain, or the water equivalent of snow, falls at any given point in the forecast area during the period.'+r(27)+' 40% does not mean 40% of the area or 40% of the time will be wet.</p>'+
+  '<table class="g-tbl"><tr><th>PRECIP %</th><th>WORDING</th><th>SAME AS</th></tr>'+
+  '<tr><td>20</td><td>Slight chance</td><td>Widely scattered</td></tr>'+
+  '<tr><td>30-50</td><td>Chance</td><td>Scattered</td></tr>'+
+  '<tr><td>60-70</td><td>Likely</td><td>Numerous</td></tr>'+
+  '<tr><td>80-100</td><td>(no qualifier)</td><td>Occasional, periods of</td></tr></table>'+
+  '<table class="g-tbl"><tr><th>SKY WORDING</th><th>OPAQUE CLOUD COVER</th></tr>'+
+  '<tr><td>Sunny / Clear</td><td>1/8 or less</td></tr>'+
+  '<tr><td>Mostly Sunny / Mostly Clear</td><td>1/8 to 3/8</td></tr>'+
+  '<tr><td>Partly Cloudy / Partly Sunny</td><td>3/8 to 5/8</td></tr>'+
+  '<tr><td>Mostly Cloudy</td><td>5/8 to 7/8</td></tr>'+
+  '<tr><td>Cloudy</td><td>7/8 to 8/8</td></tr></table>'+
+  '<table class="g-tbl"><tr><th>SUSTAINED WIND</th><th>WORDING</th></tr>'+
+  '<tr><td>0-5 mph</td><td>Light, light and variable</td></tr>'+
+  '<tr><td>15-25 mph</td><td>Breezy (mild weather); brisk or blustery (cold weather)</td></tr>'+
+  '<tr><td>20-30 mph</td><td>Windy</td></tr>'+
+  '<tr><td>30-40 mph</td><td>Very windy</td></tr>'+
+  '<tr><td>40+ mph</td><td>Strong, dangerous, high or damaging</td></tr></table>'+
+  '<p><b>Temperatures:</b> "near 50" means 48-52, "lower 50s" 50-54, "mid 50s" 53-57, "upper 50s" 56-59. <b>Periods:</b> Today is 6 a.m.-6 p.m., Tonight 6 p.m.-6 a.m., This Evening 6 p.m.-midnight, Overnight midnight-6 a.m.'+r(27)+'</p>'+
   '<h3>READ IN THIS ORDER</h3>'+
   '<ol><li><b>Alerts</b> (orange box): watches, warnings and advisories issued by your local NWS office. Expand and read the full text.</li>'+
   '<li><b>Current conditions</b>, then the <b>48-hour outlook</b> for timing, then the <b>7-day forecast</b> for the trend.</li>'+
   '<li>The <b>48-hour graphs</b> to see how the ingredients change together.</li></ol>'+
   '<h3>WHAT TO LOOK FOR IN THE GRAPHS</h3>'+
-  '<div class="g-card"><div class="g-card-hd">DEW POINT</div><p>The temperature air must cool to before it is saturated (100% humidity). It measures how much moisture is actually in the air, so it is a better comfort gauge than relative humidity. In summer: 55°F or lower feels dry and comfortable, 55-65°F gets sticky, 65°F and up is oppressive.'+r(16)+'</p><p>When the temperature and dew point lines come together, humidity approaches 100%; overnight that is when fog and low cloud become likely.</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">TEMPERATURE</div><p>The forecast air temperature for each hour. Compare it with the dew point line below: the gap between them (the dew point depression) shows how close the air is to saturation.'+r(28)+'</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">PRECIP. (%)</div><p>The hourly chance of measurable precipitation (0.01 in or more) at your point.'+r(27)+' Look for when the curve rises above about 50% to time rain or snow, and for steady high values that mean a long-lasting event rather than brief showers.</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">DEW POINT</div><p>The temperature air must cool to before it is saturated (100% humidity); a higher dew point means more moisture.'+r(28)+' It measures how much moisture is actually in the air, so it is a better comfort gauge than relative humidity. In summer: 55°F or lower feels dry and comfortable, 55-65°F gets sticky, 65°F and up is oppressive.'+r(16)+'</p><p>When the temperature and dew point lines come together, humidity approaches 100%; overnight that is when fog and low cloud become likely.</p></div>'+
   '<div class="g-card"><div class="g-card-hd">HUMIDITY</div><p>Relative humidity rises at night and falls in the afternoon even when moisture stays the same, because it depends on temperature. Use dew point to judge real moisture changes.'+r(16)+'</p></div>'+
   '<div class="g-card"><div class="g-card-hd">BAROMETRIC PRESSURE</div><p>Large pressure changes come from passing high and low pressure systems. Falling pressure signals an approaching low and worsening weather; a sudden fall signals strong wind. Pressure also has a small daily cycle (highest near 10 a.m./p.m., lowest near 4 a.m./p.m.), so ignore small wiggles and look at the multi-hour trend. Standard sea-level pressure is 1013.25 hPa (29.92 inHg).'+r(15)+'</p></div>'+
-  '<div class="g-card"><div class="g-card-hd">WIND DIRECTION / SPEED</div><p>Direction is where the wind blows <i>from</i>. A sharp wind shift accompanied by a drop in dew point and temperature marks a front or outflow passing through.</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">WIND DIRECTION / SPEED</div><p>Direction is where the wind blows <i>from</i>, and speed is the sustained (average) wind.'+r(27)+' Gusts are short bursts on top of it; NWS reports a gust when peaks and lulls differ by 10 knots or more.'+r(28)+' A sharp wind shift accompanied by a drop in dew point and temperature marks a front or outflow passing through.</p></div>'+
   '<div class="g-card"><div class="g-card-hd">SKY COVER &amp; TEMPERATURE</div><p>Clear, calm nights cool fastest; cloud cover holds heat in. Compare sky cover with the temperature curve to see why a night is forecast mild or cold.</p></div>';}},
  radar:{t:'RADAR',h:function(){return ''+
+  '<h3>WHAT IT IS FOR</h3>'+
+  '<p>NEXRAD is a network of 160 high-resolution S-band Doppler radars (WSR-88D) run jointly by the NWS, the FAA and the U.S. Air Force. It detects precipitation and wind, which are used to map where precipitation is falling and how it is moving.'+r(30)+' <b>Reflectivity</b> (in dBZ, a logarithmic measure of how much energy bounces back) shows how heavy precipitation is; <b>Doppler velocity</b> measures motion toward or away from the radar, which reveals rotation and damaging winds.'+r(28)+' Satellites see cloud tops; radar sees the precipitation inside the storm, so use both.</p>'+
   '<h3>HOW TO USE IT</h3>'+
   '<ol><li>Set a location on <b>NWS GROUND</b> first; the radar centers on it.</li>'+
   '<li><b>NATIONAL</b> shows the U.S. mosaic; <b>LOCAL</b> zooms to your location.</li>'+
@@ -163,9 +240,12 @@ var PAGES={
   '<h3>LIMITATIONS</h3>'+
   '<p>The beam rises and spreads as it travels: about 1,000 ft wider every 10 miles, and roughly 11,600 ft above the ground 98 miles out. Distant storms are sampled high up, low-level rotation is missed and small features blur, so select the station closest to the storm. Unusual temperature layers can bend the beam to the ground and create false echoes (anomalous propagation).'+r(19)+' Close to the radar, the lowest tilt passes under the upper part of storms.'+r(1)+'</p>'+
   '<p class="g-dim">Data: Iowa Environmental Mesonet mosaics (RainViewer as backup) (reflectivity, echo tops), NWS RIDGE single-site velocity and storm-relative velocity via IEM, NWS dual-pol hydrometeor class (opengeo.ncep.noaa.gov), NOAA MRMS rainfall and HRRR forecasts via IEM.'+r(25)+'</p>';}},
+ glossary:{t:'GLOSSARY',h:function(){return '<h3>GLOSSARY</h3><p class="g-dim">Definitions from the NWS Glossary unless another source is shown.'+r(28)+'</p>'+
+  '<table class="g-tbl"><tr><th>TERM</th><th>MEANING</th></tr>'+
+  G.map(function(g){return '<tr><td><b>'+g[0]+'</b></td><td>'+g[1]+'</td></tr>';}).join('')+'</table>';}},
  sources:{t:'SOURCES',h:function(){return '<h3>SOURCES</h3><p class="g-dim">Primary NOAA/NWS and university training material. Opens in a browser.</p><ol class="g-src">'+S.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+s[0]+'</a></li>';}).join('')+'</ol>';}}
 };
-var ORDER=['overview','3d','loops','nws','radar','sources'];
+var ORDER=['overview','3d','loops','nws','radar','glossary','sources'];
 
 var css='#guide{position:fixed;inset:0;z-index:2000;background:#050505;display:none;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}'+
 '#guide.open{display:flex}'+
