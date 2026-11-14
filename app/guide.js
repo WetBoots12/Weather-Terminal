@@ -138,6 +138,7 @@ var PAGES={
   '<ol><li>Pick a <b>SATELLITE / SECTOR</b>. GOES-East covers the eastern and central U.S. and Atlantic; GOES-West covers the West, Alaska, Hawaii and the Pacific. Full Disk shows the whole hemisphere; regional sectors give more detail.</li>'+
   '<li>Pick a <b>SPECTRAL BAND</b> or RGB composite. A short note on what it shows appears under the menu, and a <b>COLOR KEY</b> in the lower-left of the image explains what each color means (tap its header to hide or show it). Every band card below carries the same key.</li>'+
   '<li>Choose <b>ANIMATION FRAMES</b> and press <b>SYNC LATEST IMAGE</b>. More frames show longer trends; fewer load faster.</li>'+
+  '<li>Drag the <b>time slider</b> under the image to step to any frame (it pauses the loop); <b>▶</b> resumes. With the Full Disk overlaid on the 3D globe, the same slider appears there.</li>'+
   '<li>Leave <b>AUTO-REFRESH</b> on to pull new frames as scans arrive. <b>EMERGENCY SYSTEM RESET</b> clears a stuck loop.</li></ol>'+
   '<h3>WHY LOOP?</h3>'+
   '<p>Motion is the key information. In a loop, watch whether storms are growing (tops spreading and cooling) or decaying, which way the jet stream and dry slots are moving, and where new clouds are forming along boundaries.</p>'+
@@ -210,7 +211,7 @@ var PAGES={
   '<li><b>NATIONAL</b> flies to the U.S. mosaic; <b>LOCAL</b> flies to your location or selected station.</li>'+
   '<li><b>◇ STATIONS</b> shows every NEXRAD site as a diamond on the globe. Click one to select it; the active station is filled. Velocity, storm-relative velocity and hydrometeor class need a station.</li>'+
   '<li>Choose a product from the <b>product menu</b> in the radar bar. Its <b>color scale</b> appears just under the bar.</li>'+
-  '<li>Mosaics, base reflectivity and future radar can animate: press <b>▶ LOOP</b> to play the recent frames and <b>❚❚</b> to pause. Watch storm motion and whether cores strengthen or weaken.</li></ol>'+
+  '<li>Mosaics, base reflectivity and future radar can animate: use the <b>time slider</b> under the product bar: <b>▶</b> plays the recent frames, <b>❚❚</b> pauses, and dragging the slider steps to any frame. Watch storm motion and whether cores strengthen or weaken.</li></ol>'+
   '<h3>PRODUCTS</h3>'+
   '<div class="g-card"><div class="g-card-hd">BASE REFL — BASE REFLECTIVITY</div><p>Echo strength from the lowest radar tilt (0.5°). Updates fastest (as often as every ~90 s) and is the best view of low-level structure: <b>hook echoes</b> and <b>outflow boundaries</b> show up here. It can miss the strongest part of a storm aloft and storms forming close to the radar.'+r(1)+'</p></div>'+
   '<div class="g-card"><div class="g-card-hd">COMP REFL — COMPOSITE REFLECTIVITY</div><p>The highest reflectivity found at any height. Good for judging overall storm intensity and catching hail cores aloft, but it often hides hook echoes and boundaries, and it is only complete after the full volume scan (4-7 minutes).'+r(1)+'</p></div>'+

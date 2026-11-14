@@ -316,13 +316,16 @@ function _gFadeTo(j){var from=_G.radar[_G.radarIdx],to=_G.radar[j],ra=Math.min(1
   if(_G.radarFade)cancelAnimationFrame(_G.radarFade);
   (function step(){var k=Math.min(1,(performance.now()-t0)/D);from.alpha=ra*(1-k);to.alpha=ra*k;_gRender();
     _G.radarFade=k<1?requestAnimationFrame(step):0;if(k>=1)_gApplyOpacity();})();}
-function _gClearRadar(){_gStopLoop();_G.radar.forEach(function(l){_G.v.imageryLayers.remove(l,true);});_G.radar=[];_G.radarIdx=0;_G.radarFrames=[];}
+function _gClearRadar(){_gStopLoop();_G.radar.forEach(function(l){_G.v.imageryLayers.remove(l,true);});_G.radar=[];_G.radarIdx=0;_G.radarFrames=[];tslSet('gl-rsl',0);}
+/* drag the radar time slider: pause, release any frames still waiting to buffer, jump to the frame */
+function radarScrub(v){if(!_G.radar.length)return;if(_gOpts.loop)radarPause();if(_G.radarFade){cancelAnimationFrame(_G.radarFade);_G.radarFade=0;}
+  _G.radar.forEach(function(l){l._pre=false;});_G.radarIdx=Math.min(+v,_G.radar.length-1);_gApplyOpacity();_gFrameInfo();_gRender();}
 function _gRadar(soft){
   if(!_G.v)return;soft=soft&&_G.radar.length>1&&_gOpts.mode==='radar';if(!soft)_gClearRadar();_G.radarAt=_radarLoadedAt=Date.now();var C=Cesium,seq=_G.radarSeq=(_G.radarSeq||0)+1,key=_gOpts.radar,P=_gRP(key);
   _radarProduct=key;
   _gRadarUI();
   if(_gOpts.mode!=='radar'){_gRadarInfo('');_gTs('');_gRender();return;}
-  var play=!!(P.loop&&_gOpts.loop),stTag=_radarScope==='national'?'NATIONAL':(_radarStation||'LOCAL');
+  var play=!!P.loop,stTag=_radarScope==='national'?'NATIONAL':(_radarStation||'LOCAL');
   /* sources: list of alternatives; each is a function returning frames [{t,label,p}] or a promise of them */
   function show(frames,src,fallback){
     if(seq!==_G.radarSeq)return;
@@ -405,6 +408,7 @@ function _gFrameInfo(){
   var f=_G.radarFrames[_G.radarIdx];if(!f)return;var n=_G.radarFrames.length,P=_gRP(_gOpts.radar);
   var ts=f.label||(new Date(f.t).toISOString().slice(11,16)+' UTC'),txt=(n>1?'FRAME '+(_G.radarIdx+1)+'/'+n+' — ':'')+ts;
   _gTs(P.name+' // '+_G.radarSrc+' // '+txt);_gRadarInfo(txt+(n>1&&!_gOpts.loop?' (PAUSED)':''));
+  tslSet('gl-rsl',n,_G.radarIdx,(n>1?(_G.radarIdx+1)+'/'+n+' — ':'')+ts,_gOpts.loop);
 }
 function _gTs(t){var el=document.getElementById('gl-ts');if(el){el.style.display=t?'block':'none';el.textContent=t;}}
 function _gRadarInfo(t){var el=document.getElementById('glRadarInfo');if(el)el.innerHTML=t;}
@@ -413,7 +417,6 @@ function _gRadarUI(){
   var on=_gOpts.mode==='radar',bar=document.getElementById('gl-radar-bar');if(bar)bar.style.display=on?'flex':'none';
   var P=_gRP(_gOpts.radar),sel=document.getElementById('glRadar');if(sel&&sel.value!==_gOpts.radar)sel.value=_gOpts.radar;
   function st(id,active,dis){var el=document.getElementById(id);if(!el)return;el.classList.toggle('on',!!active);el.disabled=!!dis;}
-  var pb=document.getElementById('gl-play');if(pb){pb.style.display=P.loop?'':'none';pb.textContent=_gOpts.loop?'❚❚':'▶ LOOP';pb.title=_gOpts.loop?'Pause':'Play the recent frames';}
   st('gl-nat',_radarScope==='national');st('gl-loc',_radarScope==='local',_radarLat===null&&!_radarStation);st('gl-st',_showStations);
   var info=document.getElementById('radar-info');
   if(info){var s=_stationById(_radarStation);info.innerHTML=(_radarStation?'STATION: '+_radarStation+(s?' — '+_esc(s[1]):'')+'<br>':'')+(_radarLat!==null?'LAT: '+_radarLat.toFixed(2)+'° LON: '+_radarLon.toFixed(2)+'°':'NO LOCATION — SET ONE ON NWS GROUND OR PICK A STATION');}
@@ -552,7 +555,7 @@ function _gGoesInfo(t){var el=document.getElementById('glGoesInfo');if(el)el.inn
 function _gClearDisk(){_G.disk.forEach(function(l){_G.v.imageryLayers.remove(l,true);});_G.disk=[];_G.diskIdx=-1;(_G.diskUrls||[]).forEach(URL.revokeObjectURL);_G.diskUrls=[];}
 function toggleDiskTexture(){
   if(!_G.v)return;var btn=document.getElementById('diskTexBtn');
-  if(_diskOverlayActive){_diskOverlayActive=false;_gClearDisk();_gApplyOpacity();_gRender();if(btn){btn.textContent='◉ OVERLAY LIVE LOOP';btn.style.color='';}return;}
+  if(_diskOverlayActive){_diskOverlayActive=false;_gClearDisk();_imgTsl();_gApplyOpacity();_gRender();if(btn){btn.textContent='◉ OVERLAY LIVE LOOP';btn.style.color='';}return;}
   if(lastPath!=='FD'||(!animFrames.length&&!currentImgUrl))return;
   _diskOverlayActive=true;if(btn){btn.textContent='◉ LIVE LOOP: LOADING…';btn.style.color='var(--y)';}
   refreshDiskTextures(true);
@@ -571,7 +574,7 @@ function refreshDiskTextures(force){
     if(seq!==_G.diskSeq||!_diskOverlayActive)return;_gClearDisk();_G.diskUrls=[];
     frames.forEach(function(pcs){pcs.forEach(function(p){_G.diskUrls.push(p.url);});});
     _G.diskFrames=frames.map(function(pcs){return pcs.map(function(p){return _G.v.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({url:p.url,rectangle:p.rect,tileWidth:p.w,tileHeight:p.h,credit:'GOES ABI: NOAA/NESDIS STAR'}));});});
-    _G.disk=[].concat.apply([],_G.diskFrames);_G.diskIdx=-1;_gDiskTick(true);_gRaise();
+    _G.disk=[].concat.apply([],_G.diskFrames);_G.diskIdx=-1;_gDiskTick(true);_gRaise();_imgTsl();
     var btn=document.getElementById('diskTexBtn');if(btn)btn.textContent='◉ LIVE LOOP: ON';
   }).catch(function(){var btn=document.getElementById('diskTexBtn');if(btn)btn.textContent='◉ LIVE LOOP FAILED — RETRY';_diskOverlayActive=false;});
 }
