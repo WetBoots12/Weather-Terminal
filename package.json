@@ -23,7 +23,6 @@
     "@fontsource/jetbrains-mono": "^5.0.0",
     "@tauri-apps/cli": "^2.12.4",
     "cesium": "1.145.0",
-    "leaflet": "1.9.4",
     "satellite.js": "4.1.3"
   }
 }

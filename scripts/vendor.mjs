@@ -2,7 +2,7 @@
 // (required for the iOS build, which loads everything from the app bundle).
 import { cpSync, mkdirSync, rmSync } from 'node:fs';
 const nm = 'node_modules/', out = 'app/vendor/';
-rmSync(out + 'three.min.js', { force: true });
+for (const old of ['three.min.js', 'leaflet.js', 'leaflet.css', 'images']) rmSync(out + old, { force: true, recursive: true });
 mkdirSync(out + 'fonts', { recursive: true });
 const files = {
   'cesium/Build/Cesium/Cesium.js': 'cesium/Cesium.js',
@@ -10,9 +10,6 @@ const files = {
   'cesium/Build/Cesium/ThirdParty': 'cesium/ThirdParty',
   'cesium/Build/Cesium/Widgets': 'cesium/Widgets',
   'cesium/Build/Cesium/Workers': 'cesium/Workers',
-  'leaflet/dist/leaflet.js': 'leaflet.js',
-  'leaflet/dist/leaflet.css': 'leaflet.css',
-  'leaflet/dist/images': 'images',
   'satellite.js/dist/satellite.min.js': 'satellite.min.js',
   '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2': 'fonts/jetbrains-mono-400.woff2',
   '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2': 'fonts/jetbrains-mono-700.woff2'
