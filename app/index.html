@@ -267,7 +267,7 @@ option,optgroup{background:#111;color:var(--y)}
 #radar-legend .rl-ends{display:flex;justify-content:space-between;opacity:.65;margin-top:1px}
 #radar-legend .rl-cats{display:grid;grid-template-columns:repeat(3,1fr);gap:2px 8px}
 #radar-legend .rl-cats i{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;border:1px solid rgba(255,255,255,.2)}
-#radar-legend .rl-note{opacity:.55;margin-top:2px}
+#radar-legend .rl-bl{display:flex;align-items:center;gap:6px;margin-bottom:2px}#radar-legend .rl-bl b{width:30px;font-weight:normal}#radar-legend .rl-bl .rl-bar{flex:1}#radar-legend .rl-pad{margin-left:36px}#radar-legend .rl-types{margin-top:3px}#radar-legend .rl-types div{display:flex;gap:5px}#radar-legend .rl-types i{flex:none;width:9px;height:9px;border:1px solid rgba(255,255,255,.2)}#radar-legend .rl-types b{font-weight:normal;color:#ffb400;flex:none}#radar-legend img{display:block;max-width:100%;max-height:160px;background:#fff;margin:2px 0}#radar-legend .rl-note{opacity:.55;margin-top:2px}
 /* NEXRAD station marker tooltip */
 </style>
 <script>
@@ -468,7 +468,7 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
           <div class="gl-rrow">
             <select id="glRadar" aria-label="Radar product" onchange="setRadarProduct(this.value)">
               <optgroup label="LIVE RADAR MOSAICS"><option value="libre">GLOBAL — OPEN GOV MOSAIC</option><option value="global">GLOBAL — RAINVIEWER</option><option value="bref_qcd">US — NEXRAD BASE REFL</option><option value="eccc">N. AMERICA — ENV. CANADA 1 KM</option></optgroup>
-              <optgroup label="US REFLECTIVITY"><option value="cref_qcd">COMPOSITE REFL (MRMS)</option><option value="eet">ECHO TOPS</option><option value="hrrr">FUTURE RADAR (HRRR)</option></optgroup>
+              <optgroup label="US REFLECTIVITY"><option value="cref_qcd">COMPOSITE REFL (MRMS)</option><option value="ptype">PRECIP TYPE — RAIN / SNOW / HAIL (MRMS)</option><option value="eet">ECHO TOPS</option><option value="hrrr">FUTURE RADAR (HRRR)</option></optgroup>
               <optgroup label="VELOCITY (PICK A STATION)"><option value="vel_qcd">BASE VELOCITY</option><option value="srv">STORM-REL VELOCITY</option></optgroup>
               <optgroup label="DUAL-POL (PICK A STATION)"><option value="hhc">HYDROMETEOR CLASS</option></optgroup>
               <optgroup label="RAINFALL TOTALS (MRMS)"><option value="qpe1h">1-HOUR RAINFALL</option><option value="qpe24h">24-HOUR RAINFALL</option><option value="qpe72h">72-HOUR RAINFALL</option></optgroup>
@@ -800,6 +800,7 @@ var RADAR_PRODUCTS={
   vel_qcd:{name:'BASE VELOCITY',src:'IEM NEXRAD',station:1,legend:'vel'},
   srv:{name:'STORM-REL VELOCITY',src:'IEM NEXRAD',station:1,legend:'vel'},
   hhc:{name:'HYDROMETEOR CLASS',src:'NWS OPENGEO',station:1,legend:'hhc'},
+  ptype:{name:'PRECIP TYPE',src:'NOAA MRMS',legend:'ptype'},
   qpe1h:{name:'1-HR RAINFALL',src:'NOAA MRMS VIA IEM',legend:'qpe1h',layer:'q2-n1p'},
   qpe24h:{name:'24-HR RAINFALL',src:'NOAA MRMS VIA IEM',legend:'qpeN',layer:'q2-p24h'},
   qpe72h:{name:'72-HR RAINFALL',src:'NOAA MRMS VIA IEM',legend:'qpeN',layer:'q2-p72h'}
@@ -808,7 +809,20 @@ var RADAR_PRODUCTS={
    stops are CSS gradient stops; ticks are [percent, label]. */
 var RADAR_LEGENDS={
   refl:{t:'REFLECTIVITY',u:'dBZ',g:'#7886ae 0%,#4b64a1 6.7%,#518bbb 13.3%,#6fd6e8 20%,#11d117 26.7%,#0da212 33.3%,#0a770d 40%,#5b8807 46.7%,#ffd300 53.3%,#ffa200 60%,#ea0000 66.7%,#a30000 73.3%,#ffdfff 80%,#f960fa 86.7%,#ac00fc 93.3%,#05dde0 100%',
-    ticks:[[13.3,'10'],[26.7,'20'],[40,'30'],[53.3,'40'],[66.7,'50'],[80,'60'],[93.3,'70']],ends:['LIGHT','HEAVY / HAIL']},
+    ticks:[[13.3,'10'],[26.7,'20'],[40,'30'],[53.3,'40'],[66.7,'50'],[80,'60'],[93.3,'70']],ends:['LIGHT','HEAVY / HAIL'],
+    types:[['#6fd6e8','SNOW','USUALLY 5–35 dBZ, RARELY ABOVE 40'],['#0da212','RAIN','20–50 dBZ, LIGHT TO HEAVY'],['#ffdfff','HAIL','OFTEN 60+ dBZ IN STRONG STORMS']],
+    note:'COLORS SHOW INTENSITY, NOT TYPE // FOR SNOW, SLEET AND HAIL USE PRECIP TYPE OR HYDROMETEOR CLASS'},
+  /* RainViewer color scheme 2 (Universal Blue) with snow=1, from rainviewer.com/files/rainviewer_api_colors_table.csv; LibreWXR serves the same scheme ids */
+  rvub:{t:'REFLECTIVITY — UNIVERSAL BLUE',u:'dBZ',bars:[
+    ['RAIN','rgba(130,123,105,.29) 0%,rgba(146,136,113,.39) 6.7%,rgba(206,192,135,.59) 13.3%,#88ddee 20%,#00a3e0 26.7%,#0077aa 33.3%,#005588 40%,#ffee00 46.7%,#ffaa00 53.3%,#ff4400 60%,#c10000 66.7%,#ffaaff 73.3%,#ff77ff 80%,#ffffff 86.7%,#ffffff 93.3%,#00ff00 100%'],
+    ['SNOW','rgba(199,255,255,.5) 0%,rgba(195,255,255,.75) 6.7%,#bfffff 13.3%,#9fdfff 20%,#7fbfff 26.7%,#5f9fff 33.3%,#4f8fff 40%,#3f7fff 46.7%,#2f6fff 53.3%,#1f5fff 60%,#0f4fff 66.7%,#003fff 73.3%,#002fff 80%,#001fff 86.7%,#000fff 93.3%,#0000ff 100%']],
+    ticks:[[0,'0'],[13.3,'10'],[26.7,'20'],[40,'30'],[53.3,'40'],[66.7,'50'],[80,'60'],[93.3,'70']],
+    types:[['#ffaaff','HAIL','PINK / WHITE ON THE RAIN SCALE (55+ dBZ) IN STORMS'],['#9c9c9c','SLEET / FZ RAIN','NOT SEPARATED: SHOWN AS RAIN OR SNOW']],
+    note:'SNOW VS RAIN IS SET PER PIXEL FROM MODEL SURFACE TEMPERATURE // US: PRECIP TYPE SHOWS ICE AND HAIL'},
+  eccc:{t:'PRECIPITATION RATE',u:'MM/H RAIN // CM/H SNOW',img:'https://geo.weather.gc.ca/geomet?version=1.3.0&service=WMS&request=GetLegendGraphic&sld_version=1.1.0&layer=RADAR_1KM_RRAI&format=image/png&STYLE=Radar-Rain_14colors',
+    note:'ENV. CANADA MOSAIC: RAIN IN MM/H, SNOW IN CM/H ON THE SAME SCALE'},
+  ptype:{t:'SURFACE PRECIPITATION TYPE',u:'MRMS',img:'https://opengeo.ncep.noaa.gov/geoserver/conus/ows?service=WMS&version=1.3.0&request=GetLegendGraphic&format=image%2Fpng&width=500&height=30&layer=conus_pcpn_typ',
+    note:'RAIN, SNOW, CONVECTIVE AND HAIL CLASSES FROM RADAR PLUS MODEL TEMPERATURES // UPDATES EVERY 2 MIN'},
   vel:{t:'RADIAL VELOCITY',u:'KT',g:'#5d0599 0%,#160c9c 5%,#2077c0 10%,#32e0e3 15%,#75e7ea 20%,#b6eef1 25%,#21fd22 30%,#03cb03 35%,#029202 40%,#4e794c 45%,#8a7676 50%,#843841 55%,#a20002 60%,#d50005 65%,#fb527a 70%,#fe89cc 75%,#ffe8a3 80%,#ffbd79 85%,#ff8a4f 90%,#da6a3d 95%,#b94d2c 100%',
     ticks:[[0,'-100'],[25,'-50'],[50,'0'],[75,'50'],[100,'100']],ends:['◀ TOWARD RADAR','AWAY FROM RADAR ▶'],note:'PURPLE = RANGE FOLDED (NO DATA)'},
   eet:{t:'ECHO TOPS',u:'KFT',g:'#576da4 2.9%,#4568a6 8.6%,#599fc7 14.3%,#6fd6e8 20%,#35d65b 25.7%,#0fb714 31.4%,#0c9510 37.1%,#09730c 42.9%,#467d08 48.6%,#ead204 54.3%,#ffc000 60%,#ff9900 65.7%,#f10000 71.4%,#b80000 77.1%,#7f0000 82.9%,#fff5ff 85.7%,#ff9dff 91.4%,#ed36ef 97.1%,#e720e9 100%',
