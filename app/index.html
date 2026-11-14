@@ -13,8 +13,6 @@
 <title>GOES-STAR // COMMAND</title>
 <!-- Libraries are bundled locally (app/vendor) so the app starts offline and inside the iOS wrapper -->
 <script src="globe.js"></script>
-<link rel="stylesheet" href="vendor/leaflet.css"/>
-<script src="vendor/leaflet.js"></script>
 <script src="vendor/satellite.min.js"></script>
 <script src="guide.js"></script>
 <script src="legend.js"></script>
@@ -111,6 +109,13 @@ option,optgroup{background:#111;color:var(--y)}
 .gl-mode button.on{background:var(--y);color:#000;font-weight:700}
 .gl-float{position:absolute;top:12px;right:12px;z-index:15;width:210px;margin:0;box-shadow:0 0 12px rgba(0,0,0,.8)}
 .gl-float button{padding:8px 0;font-size:11px}
+#gl-ts{position:absolute;top:56px;right:12px;z-index:15;font-size:9px;background:rgba(0,0,0,.75);padding:3px 8px;display:none;max-width:60%;text-align:right}
+#gl-radar-bar{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:15;display:none;flex-direction:column;gap:5px;align-items:center;max-width:calc(100% - 16px)}
+.gl-rrow{display:flex;flex-wrap:wrap;justify-content:center;gap:2px;background:rgba(0,0,0,.9);border:1px solid rgba(255,180,0,.35);padding:3px}
+.gl-rrow select{width:auto;margin:0;padding:4px 6px;font-size:9px}
+.gl-rrow button{background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.6);font-family:inherit;font-size:9px;letter-spacing:.06em;padding:4px 10px;cursor:pointer}
+.gl-rrow button.on{background:rgba(255,180,0,.28);color:#ffb400;border-color:#ffb400}
+.gl-rrow button:disabled{opacity:.35;pointer-events:none}
 .sat-lbl{position:absolute;font-size:9px;pointer-events:none;text-shadow:0 0 6px #000;z-index:10;letter-spacing:.05em}
 #sat-tip{position:absolute;background:rgba(0,0,0,.92);border:1px solid var(--y);padding:5px 10px;font-size:10px;pointer-events:none;z-index:20;display:none;line-height:1.6}
 #sat-img{max-width:100%;max-height:100%;object-fit:contain;display:none;transition:opacity .3s}
@@ -264,9 +269,6 @@ option,optgroup{background:#111;color:var(--y)}
 #radar-legend .rl-cats i{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;border:1px solid rgba(255,255,255,.2)}
 #radar-legend .rl-note{opacity:.55;margin-top:2px}
 /* NEXRAD station marker tooltip */
-.leaflet-tooltip{background:#111!important;border:1px solid rgba(255,180,0,.5)!important;border-radius:0!important;color:#ffb400!important;font-family:'JetBrains Mono',monospace!important;font-size:10px!important;text-transform:uppercase!important;padding:4px 8px!important;box-shadow:none!important;white-space:nowrap!important}
-.leaflet-tooltip::before{border-top-color:rgba(255,180,0,.5)!important}
-.leaflet-container .leaflet-control-attribution{background:rgba(0,0,0,.55);color:rgba(255,255,255,.45);font-size:8px;padding:0 4px;margin:0}
 </style>
 <script>
 var IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
@@ -289,7 +291,6 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       <button class="tab-btn" onclick="switchTab('3d',this)">3D ORBITAL</button>
       <button class="tab-btn active" onclick="switchTab('loops',this)">LIVE IMAGERY</button>
       <button class="tab-btn" onclick="switchTab('nws',this)">NWS GROUND</button>
-      <button class="tab-btn" onclick="switchTab('radar',this)">RADAR</button>
       <button class="guide-btn" onclick="openGuide()" aria-label="Open field manual">? GUIDE</button>
     </div>
   </div>
@@ -310,12 +311,10 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       <div id="glStatus" class="stat" style="font-size:9px;margin-top:-4px;margin-bottom:4px"></div>
       <button class="btn-ghost" style="margin-top:0" onclick="globeHome()">⌂ RESET VIEW</button>
       <div class="phd" style="margin-top:10px">WEATHER LAYERS</div>
-      <span class="lbl">OVERLAY</span>
-      <div class="gl-mode"><button data-m="radar" onclick="globeMode('radar')">RADAR</button><button data-m="goes" onclick="globeMode('goes')">GOES</button><button data-m="off" onclick="globeMode('off')">OFF</button></div>
+      <div class="stat" style="font-size:9px;margin-bottom:6px">OVERLAY SWITCH, RADAR PRODUCT AND RADAR CONTROLS ARE ON THE GLOBE (TOP RIGHT / BOTTOM)</div>
       <div id="glRadarBox">
-      <span class="lbl">RADAR SOURCE</span>
-      <select id="glRadar" onchange="globeOpt('radar',this.value)"><option value="libre">GLOBAL — OPEN GOV MOSAIC (LIBREWXR)</option><option value="global">GLOBAL — RAINVIEWER</option><option value="iem">US — NOAA NEXRAD (IEM, 5-MIN)</option><option value="eccc">N. AMERICA — ECCC 1 KM (CANADA)</option></select>
-      <label class="gl-row"><input type="checkbox" id="glRadarLoop" onchange="globeOpt('loop',this.checked)">ANIMATE RECENT FRAMES</label>
+      <span class="lbl">RADAR LOCATION</span>
+      <div class="stat" id="radar-info" style="font-size:9px">NO LOCATION — SET ONE ON NWS GROUND OR PICK A STATION</div>
       <div id="glRadarInfo" class="stat" style="font-size:9px;margin-bottom:6px"></div>
       </div>
       <div id="glGoesBox">
@@ -455,15 +454,6 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       </div>
       <div id="nws-loc-info" style="margin-top:8px;font-size:9px;opacity:.5;display:flex;align-items:center;gap:10px"><span id="nws-loc-text"></span><button id="nws-globe-btn" onclick="flyToNWSPin()" style="display:none;background:transparent;border:1px solid rgba(255,68,68,.5);color:#ff4444;font-family:inherit;font-size:9px;padding:2px 8px;cursor:pointer;letter-spacing:.06em">⊕ VIEW ON GLOBE</button></div>
     </div>
-    <div id="panel-radar" class="panel hidden">
-      <div class="phd">NEXRAD RADAR</div>
-      <div class="stat" id="radar-info">NO LOCATION SELECTED<br>SEARCH IN NWS GROUND TAB</div>
-      <div class="phd" style="margin-top:10px">PLAYBACK</div>
-      <button class="btn" onclick="radarPlay()">▶ PLAY LOOP</button>
-      <button class="btn-ghost" onclick="radarPause()">⏸ PAUSE</button>
-      <button class="btn-ghost" onclick="openGuide()">? HOW TO USE THIS TAB</button>
-      <div class="stat" id="radar-frame-info" style="margin-top:8px;font-size:9px;opacity:.5"></div>
-    </div>
     <div class="panel" style="margin-top:auto">
       <div class="stat" id="sys-status">* SYS: NOMINAL<br>* SRC: NOAA / NWS API<br>* STATION: IDLE</div>
     </div>
@@ -473,6 +463,23 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
     <div id="view-3d" class="view">
       <div id="globe-wrap"><div id="globe-cesium"></div>
         <div class="gl-mode gl-float" title="Switch the weather overlay"><button data-m="radar" onclick="globeMode('radar')">RADAR</button><button data-m="goes" onclick="globeMode('goes')">GOES</button><button data-m="off" onclick="globeMode('off')">OFF</button></div>
+        <div id="gl-ts"></div>
+        <div id="gl-radar-bar">
+          <div class="gl-rrow">
+            <select id="glRadar" aria-label="Radar product" onchange="setRadarProduct(this.value)">
+              <optgroup label="LIVE RADAR MOSAICS"><option value="libre">GLOBAL — OPEN GOV MOSAIC</option><option value="global">GLOBAL — RAINVIEWER</option><option value="bref_qcd">US — NEXRAD BASE REFL</option><option value="eccc">N. AMERICA — ENV. CANADA 1 KM</option></optgroup>
+              <optgroup label="US REFLECTIVITY"><option value="cref_qcd">COMPOSITE REFL (MRMS)</option><option value="eet">ECHO TOPS</option><option value="hrrr">FUTURE RADAR (HRRR)</option></optgroup>
+              <optgroup label="VELOCITY (PICK A STATION)"><option value="vel_qcd">BASE VELOCITY</option><option value="srv">STORM-REL VELOCITY</option></optgroup>
+              <optgroup label="DUAL-POL (PICK A STATION)"><option value="hhc">HYDROMETEOR CLASS</option></optgroup>
+              <optgroup label="RAINFALL TOTALS (MRMS)"><option value="qpe1h">1-HOUR RAINFALL</option><option value="qpe24h">24-HOUR RAINFALL</option><option value="qpe72h">72-HOUR RAINFALL</option></optgroup>
+            </select>
+            <button id="gl-play" onclick="radarToggle()">▶ LOOP</button>
+            <button id="gl-nat" onclick="setRadarScope('national')">NATIONAL</button>
+            <button id="gl-loc" onclick="setRadarScope('local')">LOCAL</button>
+            <button id="gl-st" onclick="toggleRadarStations()">◇ STATIONS</button>
+          </div>
+          <div id="radar-legend" aria-live="polite"></div>
+        </div>
         <div id="sat-tip"></div>
       </div>
     </div>
@@ -486,43 +493,6 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
     </div>
     <div id="view-nws" class="view" style="overflow-y:auto;padding:14px;background:#000">
       <div id="nws-content"><div class="nws-placeholder" style="height:300px"><div style="text-align:center;opacity:.2"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin:0 auto 12px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg><div style="font-size:11px">SEARCH FOR A U.S. LOCATION TO ACQUIRE NWS FORECAST DATA</div></div></div></div>
-    </div>
-    <div id="view-radar" class="view" style="background:#000;position:relative">
-      <div id="radar-map" style="width:100%;height:100%"></div>
-      <div id="radar-ph" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.2;pointer-events:none"><div style="text-align:center;font-size:11px">NO LOCATION — USE NWS GROUND TAB</div></div>
-      <div id="radar-ts" style="position:absolute;top:8px;right:8px;font-size:9px;background:rgba(0,0,0,.7);padding:3px 8px;display:none;z-index:1000"></div>
-      <div id="radar-ctrl" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:1001;display:flex;flex-direction:column;gap:5px;align-items:center">
-        <div style="display:flex;gap:2px;background:rgba(0,0,0,.9);border:1px solid rgba(255,180,0,.35);padding:3px">
-          <button id="rsc-national" onclick="setRadarScope('national')" style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 12px;cursor:pointer;letter-spacing:.05em;transition:all .15s">NATIONAL</button>
-          <button id="rsc-local"    onclick="setRadarScope('local')"    style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 12px;cursor:pointer;letter-spacing:.05em;transition:all .15s">LOCAL</button>
-          <div style="width:1px;background:rgba(255,180,0,.2);margin:2px 3px"></div>
-          <button id="rsc-play" onclick="radarToggle()" style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.8);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 10px;cursor:pointer;letter-spacing:.05em">❚❚</button>
-          <button id="rsc-stations" onclick="toggleRadarStations()" style="background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.55);font-family:inherit;font-size:9px;text-transform:uppercase;padding:4px 10px;cursor:pointer;letter-spacing:.05em;transition:all .15s">◎ STATIONS</button>
-        </div>
-        <div id="radar-legend" aria-live="polite"></div>
-        <div style="display:flex;gap:2px;background:rgba(0,0,0,.9);border:1px solid rgba(255,180,0,.35);padding:3px">
-          <select id="radar-prod" aria-label="Radar product" onchange="setRadarProduct(this.value)">
-            <optgroup label="REFLECTIVITY">
-              <option value="bref_qcd">BASE REFL (LOOP)</option>
-              <option value="cref_qcd">COMPOSITE REFL</option>
-              <option value="eet">ECHO TOPS</option>
-              <option value="hrrr">FUTURE RADAR (HRRR)</option>
-            </optgroup>
-            <optgroup label="VELOCITY (PICK A STATION)">
-              <option value="vel_qcd">BASE VELOCITY</option>
-              <option value="srv">STORM-REL VELOCITY</option>
-            </optgroup>
-            <optgroup label="DUAL-POL (PICK A STATION)">
-              <option value="hhc">HYDROMETEOR CLASS</option>
-            </optgroup>
-            <optgroup label="RAINFALL TOTALS (MRMS)">
-              <option value="qpe1h">1-HOUR RAINFALL</option>
-              <option value="qpe24h">24-HOUR RAINFALL</option>
-              <option value="qpe72h">72-HOUR RAINFALL</option>
-            </optgroup>
-          </select>
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -538,7 +508,7 @@ window.addEventListener('load',function(){var v='GOES19|CONUS|1250x750#GEOCOLOR'
 function dmwAvail(){var ss=document.getElementById('sectorSel'),bs=document.getElementById('bandSel'),o=bs.querySelector('option[value="DMW"]'),off=ss.value.indexOf('|SECTOR/')>0;o.disabled=off;o.textContent='Derived Motion Winds'+(off?' (FD/CONUS only)':'');if(off&&bs.value==='DMW'){bs.value='GEOCOLOR';bs.dispatchEvent(new Event('change'));}}
 document.getElementById('sectorSel').addEventListener('change',dmwAvail);
 var nwsActive=false;
-function switchTab(t,el){if(t!=='3d'&&typeof globePause==='function')globePause(true);document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});el.classList.add('active');document.querySelectorAll('.panel').forEach(function(p){p.classList.add('hidden')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});document.getElementById('panel-'+t).classList.remove('hidden');document.getElementById('view-'+t).classList.add('active');if(t==='3d'){setStatus('#22c55e','3D ORBITAL VIEW // REAL-TIME POSITIONING','G19: 75.2°W | G18: 137.2°W');setSys('* SYS: NOMINAL<br>* VIEW: 3D ORBITAL<br>* POSITIONING: REAL-TIME');if(globeReady)globePause(false);else initGlobe()}else if(t==='loops'){if(currentImgUrl)setStatus('#22c55e','ACTIVE // '+lastSat+' — '+lastPath+' — '+lastBand,lastRes);else setStatus('#444','FEED OFFLINE // NO SIGNAL','—');setSys('* SYS: NOMINAL<br>* SRC: CDN.STAR.NESDIS.NOAA.GOV<br>* STATION: '+(currentImgUrl?'ACTIVE':'IDLE'))}else if(t==='nws'){if(!nwsActive)setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: '+(nwsActive?'ACTIVE':'IDLE'))}else if(t==='radar'){setStatus('#22c55e','RADAR // NEXRAD','—');setSys('* SYS: NOMINAL<br>* SRC: '+_radarSrcTxt()+'<br>* STATION: '+(typeof _radarStation!=='undefined'&&_radarStation?_radarStation:'IDLE'));if(!radarReady)initRadarMap();if(typeof radarMap!=='undefined'&&radarMap)setTimeout(function(){radarMap.invalidateSize();},50);_updateRadarProductUI();}document.getElementById('sys-status').parentElement.classList.remove('hidden')}
+function switchTab(t,el){if(t!=='3d'&&typeof globePause==='function')globePause(true);document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});el.classList.add('active');document.querySelectorAll('.panel').forEach(function(p){p.classList.add('hidden')});document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});document.getElementById('panel-'+t).classList.remove('hidden');document.getElementById('view-'+t).classList.add('active');if(t==='3d'){setStatus('#22c55e','3D ORBITAL VIEW // REAL-TIME POSITIONING','G19: 75.2°W | G18: 137.2°W');setSys('* SYS: NOMINAL<br>* VIEW: 3D ORBITAL<br>* POSITIONING: REAL-TIME');if(globeReady)globePause(false);else initGlobe()}else if(t==='loops'){if(currentImgUrl)setStatus('#22c55e','ACTIVE // '+lastSat+' — '+lastPath+' — '+lastBand,lastRes);else setStatus('#444','FEED OFFLINE // NO SIGNAL','—');setSys('* SYS: NOMINAL<br>* SRC: CDN.STAR.NESDIS.NOAA.GOV<br>* STATION: '+(currentImgUrl?'ACTIVE':'IDLE'))}else if(t==='nws'){if(!nwsActive)setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: '+(nwsActive?'ACTIVE':'IDLE'))}document.getElementById('sys-status').parentElement.classList.remove('hidden')}
 
 
 /* LIVE IMAGERY — ANIMATED LOOP FROM NOAA CDN
@@ -718,7 +688,7 @@ var _lastNwsSync=0,_nwsLastQ=null,_nwsBusy=false;
 function _fetchT(u,o,ms){o=o||{};if(!('AbortController' in window))return fetch(u,o);var c=new AbortController(),t=setTimeout(function(){c.abort()},ms||12000);o.signal=c.signal;return fetch(u,o).finally(function(){clearTimeout(t)});}
 async function acquireNWS(silent){silent=(silent===true)&&!!_nwsLastQ&&nwsActive;if(_nwsBusy)return;var input=silent?_nwsLastQ.input:document.getElementById('locSearchIn').value.trim();if(!input){alert('ENTER A LOCATION');return}if(nwsAutoTimer){clearInterval(nwsAutoTimer);nwsAutoTimer=null}_nwsBusy=true;if(!silent)closeMobSidebar();var content=document.getElementById('nws-content'),lat,lon,place;if(silent){document.getElementById('nwsAutoCd').textContent='(UPDATING…)'}else{setStatus('#ffb400','NWS GROUND // ACQUIRING — '+input,'LOADING');setSys('* STATUS: ACQUIRING<br>* INPUT: '+input+'<br>* SRC: API.WEATHER.GOV');if(!silent)content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">CONNECTING...</div></div>'}try{if(silent){lat=_nwsLastQ.lat;lon=_nwsLastQ.lon;place=_nwsLastQ.place}else if(selectedLat&&selectedLon&&!/^\d{5}$/.test(input)){lat=parseFloat(selectedLat).toFixed(4);lon=parseFloat(selectedLon).toFixed(4);place=selectedPlace}else if(/^\d{5}$/.test(input)){if(!silent)content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">RESOLVING ZIP '+input+'...</div></div>';var geoR=await _fetchT('https://nominatim.openstreetmap.org/search?postalcode='+input+'&country=US&format=json&limit=1&addressdetails=1',{headers:{'Accept-Language':'en-US'}});if(!geoR.ok)throw new Error('GEOCODER UNREACHABLE');var geoJ=await geoR.json();if(!geoJ.length)throw new Error('ZIP '+input+' NOT FOUND');lat=parseFloat(geoJ[0].lat).toFixed(4);lon=parseFloat(geoJ[0].lon).toFixed(4);var ad=geoJ[0].address||{};place=(ad.city||ad.town||ad.village||'')+(ad.state?', '+ad.state:'');if(!place)place=geoJ[0].display_name.split(',').slice(0,3).join(',')}else{if(!silent)content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">SEARCHING "'+input+'"...</div></div>';var geoR=await _fetchT('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(input)+'&countrycodes=us&format=json&limit=1&addressdetails=1',{headers:{'Accept-Language':'en-US'}});if(!geoR.ok)throw new Error('GEOCODER UNREACHABLE');var geoJ=await geoR.json();if(!geoJ.length)throw new Error('"'+input+'" NOT FOUND — TRY A ZIP CODE');lat=parseFloat(geoJ[0].lat).toFixed(4);lon=parseFloat(geoJ[0].lon).toFixed(4);var ad=geoJ[0].address||{};place=(ad.city||ad.town||ad.village||'')+(ad.state?', '+ad.state:'');if(!place)place=geoJ[0].display_name.split(',').slice(0,3).join(',')}if(!silent)content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">CONNECTING TO NWS GRID — '+lat+'°, '+lon+'°...</div></div>';var ptR=await _fetchT('https://api.weather.gov/points/'+lat+','+lon);if(!ptR.ok)throw new Error('NWS POINT LOOKUP FAILED — LOCATION MAY BE OUTSIDE FORECAST COVERAGE');var ptJ=await ptR.json(),pr=ptJ.properties;if(!silent)content.innerHTML='<div class="nws-placeholder" style="height:300px"><div class="pulse" style="font-size:11px">DOWNLOADING FORECAST FROM '+pr.gridId+'...</div></div>';var results=await Promise.all([_fetchT(pr.forecast),_fetchT(pr.forecastHourly).catch(function(){return{ok:false}}),_fetchT('https://api.weather.gov/alerts/active?point='+lat+','+lon).catch(function(){return{ok:false}}),_fetchT('https://api.weather.gov/gridpoints/'+pr.gridId+'/'+pr.gridX+','+pr.gridY).catch(function(){return{ok:false}}),_fetchT(pr.observationStations+'?limit=1').catch(function(){return{ok:false}})]);if(!results[0].ok)throw new Error('FORECAST DATA UNAVAILABLE');var jsons=await Promise.all([results[0].json(),results[1].ok?results[1].json():null,results[2].ok?results[2].json():null,results[3].ok?results[3].json():null,results[4].ok?results[4].json():null]);var periods=jsons[0].properties.periods,hourly=jsons[1]?jsons[1].properties.periods.slice(0,48):[],alerts=jsons[2]?jsons[2].features:[],gridData=jsons[3]||null,obsStationId=jsons[4]&&jsons[4].features&&jsons[4].features.length?jsons[4].features[0].properties.stationIdentifier:null;var obsPress=[];if(obsStationId){try{var obR=await _fetchT('https://api.weather.gov/stations/'+obsStationId+'/observations?limit=10');if(obR.ok){var obJ=await obR.json();if(obJ.features){obJ.features.forEach(function(f){var p=f.properties;if(p&&p.barometricPressure&&p.barometricPressure.value!==null&&p.timestamp){obsPress.push({t:new Date(p.timestamp).getTime(),v:p.barometricPressure.value});}});obsPress.sort(function(a,b){return a.t-b.t;});}}}catch(e){}}_lastNwsSync=Date.now();_nwsLastQ={input:input,lat:lat,lon:lon,place:place};_nwsTZ=pr.timeZone||null;var updated=new Date(jsons[0].properties.updated).toUTCString().slice(0,25),dc=pr.city||place.split(',')[0]||'',ds=pr.state||'';nwsActive=true;if(typeof placeNWSPin==='function')placeNWSPin(parseFloat(lat),parseFloat(lon));if(!silent&&typeof updateRadarLocation==='function')updateRadarLocation(parseFloat(lat),parseFloat(lon),pr.radarStation||null);setStatus('#22c55e','NWS GROUND // '+dc+', '+ds+' — ACTIVE','GRID: '+pr.gridId+'('+pr.gridX+','+pr.gridY+')');setSys('* STATUS: ACTIVE FEED<br>* LOC: '+dc+', '+ds+'<br>* GRID: '+pr.gridId+' '+pr.gridX+','+pr.gridY+'<br>* RADAR: '+(pr.radarStation||'—')+'<br>* OBS STN: '+(obsStationId||'—'));document.getElementById('nws-loc-text').innerHTML='<span style="color:var(--y)">● '+dc+', '+ds+' — '+lat+'°, '+lon+'°</span>';document.getElementById('nws-globe-btn').style.display='block';var cur=periods[0],alertsHtml='';if(alerts.length>0)alertsHtml=alerts.map(function(a){return'<div class="nws-alerts fade-up" onclick="this.classList.toggle(\'expanded\')">⚠ <b>'+_esc(a.properties.headline||a.properties.event)+'</b><div class="nws-alert-body"><span style="opacity:.7;white-space:pre-line">'+_esc(a.properties.description||'')+'</span></div><span style="font-size:9px;opacity:.4">EXPIRES: '+((a.properties.ends||a.properties.expires)?new Date(a.properties.ends||a.properties.expires).toUTCString().slice(0,25):'—')+'</span><div style="font-size:8px;opacity:.35;margin-top:3px">TAP TO EXPAND ▾</div></div>'}).join('');var imp0=(_nwsUnits==='imperial');var hrHtml=hourly.map(function(h,i){var t=new Date(h.startTime),hStr=fmtHour(t.getTime());var ht=imp0?h.temperature:f2c(h.temperature);var hum2=h.relativeHumidity?h.relativeHumidity.value+'%':'—';var pop2=h.probabilityOfPrecipitation?h.probabilityOfPrecipitation.value+'%':'—';return'<div class="nws-hr fade-up" style="animation-delay:'+i*30+'ms" onclick="toggleNWSCard(this)"><div class="nws-hr-time">'+hStr+'</div><div class="nws-hr-temp">'+ht+(imp0?'°F':'°C')+'</div><div class="nws-hr-wind">'+windConvStr(h.windSpeed||'')+' '+(h.windDirection||'')+'</div><div class="nws-hr-short">'+(h.shortForecast||'').substring(0,18)+'</div><div class="nws-hr-detail"><b>'+(h.shortForecast||'')+'</b><br>HUMIDITY: '+hum2+'<br>PRECIP: '+pop2+'</div></div>'}).join('');var fcHtml=periods.map(function(p,i){var pt=imp0?p.temperature:f2c(p.temperature);var hasDetail=!!(p.detailedForecast&&p.detailedForecast!==p.shortForecast);var shortContent=hasDetail?'<div class="nws-card-short-wrap"><div class="nws-card-short-inner"><div class="nws-card-short-slide">'+(p.shortForecast||'')+'</div><div class="nws-card-short-slide">'+(p.detailedForecast||'').substring(0,120)+'</div></div></div><div class="nws-card-detail">'+(p.detailedForecast||'')+'<div style="font-size:8px;opacity:.35;margin-top:5px">▲ COLLAPSE</div></div>':'<div class="nws-card-short">'+(p.shortForecast||'')+'</div>';return'<div class="nws-card fade-up'+(hasDetail?' nws-scroll-active':'')+'" style="animation-delay:'+i*50+'ms" onclick="toggleNWSCard(this)"><div class="nws-card-name">'+p.name+'</div><div class="nws-card-temp">'+pt+(imp0?'°F':'°C')+'</div><div class="nws-card-wind">'+windConvStr(p.windSpeed||'')+' '+(p.windDirection||'')+'</div>'+shortContent+'</div>'}).join('');var _vw=document.getElementById('view-nws'),_st=_vw.scrollTop;content.classList.toggle('no-anim',silent);content.innerHTML='<div class="nws-hdr fade-up">'+dc+', '+ds+'</div><div class="nws-sub fade-up" style="animation-delay:50ms">GRID: '+pr.gridId+' ('+pr.gridX+','+pr.gridY+') | RADAR: '+(pr.radarStation||'—')+' | TZ: '+(pr.timeZone||'—')+' | UPDATED: '+updated+' UTC</div>'+alertsHtml+'<div class="nws-section-hd fade-up" style="animation-delay:100ms">CURRENT CONDITIONS</div><div id="nws-current-block"></div>'+(hourly.length?'<div class="nws-section-hd fade-up" style="animation-delay:200ms">48-HOUR OUTLOOK</div><div class="nws-hourly">'+hrHtml+'</div>':'')+'<div class="nws-section-hd fade-up" style="animation-delay:250ms">7-DAY FORECAST</div><div class="nws-grid">'+fcHtml+'</div><div id="nws-graph-section"></div><div class="nws-ext-link fade-up">GRAPHICAL: <a href="https://forecast.weather.gov/MapClick.php?lat='+lat+'&lon='+lon+'&FcstType=graphical" target="_blank">NWS CHART ↗</a> &nbsp;|&nbsp; <a href="https://forecast.weather.gov/MapClick.php?lat='+lat+'&lon='+lon+'" target="_blank">FORECAST ↗</a> &nbsp;|&nbsp; <a href="https://radar.weather.gov/" target="_blank">RADAR ↗</a> &nbsp;|&nbsp; <a href="https://www.nhc.noaa.gov" target="_blank">NHC ↗</a></div>';renderCurrentConditions(cur);renderNWSGraphs(gridData,hourly,obsPress,obsStationId);if(silent)_vw.scrollTop=_st;document.getElementById('nwsRefreshBtn').style.display='block';document.getElementById('nwsAutoRow').style.display='flex';_nwsBusy=false;startNWSAuto()}catch(err){_nwsBusy=false;if(silent){setStatus('#ffb400','NWS GROUND // REFRESH FAILED — WILL RETRY','—');startNWSAuto();return}nwsActive=false;setStatus('#ff4444','NWS GROUND // ERROR','—');setSys('* STATUS: ERROR<br>* ERR: '+err.message.substring(0,40));content.innerHTML='<div class="nws-placeholder" style="height:300px"><div style="text-align:center;padding:30px"><div style="color:#ff6644;font-size:11px;margin-bottom:8px">ACQUISITION FAILURE</div><div style="font-size:10px;opacity:.5;margin-bottom:16px">'+err.message+'</div><div style="font-size:10px;opacity:.4;margin-bottom:14px">'+(/NOT FOUND|OUTSIDE/.test(err.message)?'TRY A DIFFERENT LOCATION OR ZIP CODE.':'CHECK YOUR CONNECTION AND TRY AGAIN.')+'</div><button class="btn" style="width:auto;padding:8px 22px" onclick="acquireNWS()">RETRY</button></div></div>'}}
 function clearNWS(){if(nwsAutoTimer)clearInterval(nwsAutoTimer);_nwsLastQ=null;_nwsTZ=null;if(typeof removeNWSPin==='function')removeNWSPin();document.getElementById('locSearchIn').value='';document.getElementById('locResults').style.display='none';document.getElementById('nws-loc-text').textContent='';document.getElementById('nws-globe-btn').style.display='none';selectedLat=null;selectedLon=null;selectedPlace='';nwsActive=false;document.getElementById('nwsAutoRow').style.display='none';document.getElementById('nwsRefreshBtn').style.display='none';document.getElementById('nws-content').innerHTML='<div class="nws-placeholder" style="height:300px"><div style="text-align:center;opacity:.2"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin:0 auto 12px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg><div style="font-size:11px">SEARCH FOR A U.S. LOCATION TO ACQUIRE NWS FORECAST DATA</div></div></div>';setStatus('#444','NWS GROUND // NO STATION SELECTED','—');setSys('* SYS: NOMINAL<br>* SRC: API.WEATHER.GOV<br>* STATION: IDLE')}
-document.addEventListener('visibilitychange',function(){if(document.hidden)return;var _n=Date.now();if(currentImgUrl&&document.getElementById('autoRefreshChk').checked&&_n-_lastImgSync>(lastPath==='FD'?600000:300000))syncImage(true);if(nwsActive&&document.getElementById('nwsAutoChk').checked&&_n-_lastNwsSync>NWS_REFRESH_SEC*1000)acquireNWS(true);if(radarReady&&radarMap&&_n-_radarLoadedAt>RADAR_REFRESH_MS)_applyRadarProduct(false);if(typeof _globeKick==='function'&&globeReady)_globeKick();if(radarReady&&radarMap){radarMap.invalidateSize();}});
+document.addEventListener('visibilitychange',function(){if(document.hidden)return;var _n=Date.now();if(currentImgUrl&&document.getElementById('autoRefreshChk').checked&&_n-_lastImgSync>(lastPath==='FD'?600000:300000))syncImage(true);if(nwsActive&&document.getElementById('nwsAutoChk').checked&&_n-_lastNwsSync>NWS_REFRESH_SEC*1000)acquireNWS(true);if(typeof _globeKick==='function'&&globeReady)_globeKick();});
 /* NWS AUTO-REFRESH */
 var nwsAutoTimer=null,nwsAutoCountdown=0,NWS_REFRESH_SEC=300;
 function startNWSAuto(){if(nwsAutoTimer)clearInterval(nwsAutoTimer);if(!document.getElementById('nwsAutoChk').checked)return;nwsAutoCountdown=NWS_REFRESH_SEC;document.getElementById('nwsAutoCd').textContent='('+Math.floor(NWS_REFRESH_SEC/60)+':'+String(NWS_REFRESH_SEC%60).padStart(2,'0')+')';nwsAutoTimer=setInterval(function(){if(document.hidden)return;nwsAutoCountdown--;if(nwsAutoCountdown<=0){clearInterval(nwsAutoTimer);nwsAutoTimer=null;acquireNWS(true)}else document.getElementById('nwsAutoCd').textContent='('+Math.floor(nwsAutoCountdown/60)+':'+String(nwsAutoCountdown%60).padStart(2,'0')+')'}, 1000)}
@@ -815,11 +785,10 @@ var _NEXRAD=[
    _radarScope:   national | local
    _radarStation: selected NEXRAD id (e.g. KTLX) or null
    _radarLat/_radarLon: local view center
-   All product layers live in _rvLayers (animated loop) or _radarLayer (single layer). */
-var radarMap=null,radarReady=false,_radarLat=null,_radarLon=null,_radarStation=null;
-var _rvFrames=[],_rvLayers=[],_rvIdx=0,_rvTimer=null,_rvPaused=false,_rvRefreshTimer=null;
-var _radarProduct='bref_qcd',_radarScope='local',_radarLayer=null,_radarLoadSeq=0;
-var _nexradStations=_NEXRAD,_stationMarkers=null,_showStations=false;
+   Layers live on the 3D globe (globe.js, RADAR section). */
+var _radarLat=null,_radarLon=null,_radarStation=null;
+var _radarProduct='bref_qcd',_radarScope='local';
+var _nexradStations=_NEXRAD,_showStations=false;
 var _radarLoadedAt=0,RADAR_REFRESH_MS=300000,IEM_TILE='https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/';
 /* Product registry. src = sidebar source label; station = needs a selected NEXRAD site;
    loop = animated (shows the play/pause button); legend = key into RADAR_LEGENDS. */
@@ -850,20 +819,6 @@ var RADAR_LEGENDS={
     ticks:[[9.8,'.25'],[19.5,'.5'],[29.3,'.75'],[39,'1'],[54.7,'3'],[70.3,'5'],[80.1,'10'],[89.8,'15']],note:'SCALE IS STRETCHED ABOVE 1 IN // GRAY = NO COVERAGE'},
   hhc:{t:'HYDROMETEOR CLASSIFICATION',cats:[['#00fb90','RA','RAIN'],['#00bb00','HR','HEAVY RAIN'],['#d0d060','BD','BIG DROPS'],['#ff0000','HA','HAIL + RAIN'],['#d28484','GR','GRAUPEL'],['#ffb0b0','IC','ICE CRYSTALS'],['#00ffff','DS','DRY SNOW'],['#0090ff','WS','WET SNOW'],['#9c9c9c','BI','BIRDS / BUGS'],['#767676','GC','CLUTTER'],['#e700ff','UK','UNKNOWN']],note:'LOWEST TILT // ALGORITHM BEST GUESS, NOT A SURFACE OBSERVATION'}
 };
-function _renderRadarLegend(){
-  var el=document.getElementById('radar-legend');if(!el)return;
-  var p=RADAR_PRODUCTS[_radarProduct],L=p&&RADAR_LEGENDS[p.legend];
-  if(!L){el.style.display='none';return;}
-  var h='<div class="rl-hd"><span>'+L.t+'</span><span>'+(L.u||'')+'</span></div>';
-  if(L.cats){h+='<div class="rl-cats">'+L.cats.map(function(c){return '<span title="'+c[2]+'"><i style="background:'+c[0]+'"></i>'+c[2]+'</span>';}).join('')+'</div>';}
-  else{
-    h+='<div class="rl-bar" style="background:linear-gradient(to right,'+L.g+')"></div><div class="rl-ticks">'+
-      L.ticks.map(function(t){var x=Math.min(Math.max(t[0],4),96);return '<span style="left:'+x+'%">'+t[1]+'</span>';}).join('')+'</div>';
-    if(L.ends)h+='<div class="rl-ends"><span>'+L.ends[0]+'</span><span>'+L.ends[1]+'</span></div>';
-  }
-  if(L.note)h+='<div class="rl-note">'+L.note+'</div>';
-  el.innerHTML=h;el.style.display='block';
-}
 function _radarSrcTxt(){var p=RADAR_PRODUCTS[_radarProduct];return p?p.src:'IEM NEXRAD';}
 /* IEM RIDGE single-site tiles are georeferenced Web-Mercator tiles, so they line up with the
    basemap (the old radar.weather.gov "standard" GIFs are full map graphics and could not). */
@@ -889,7 +844,7 @@ function _restoreRadarUrl(){
   try{
     var r=new URLSearchParams(window.location.search).get('r');if(!r)return;
     var parts=r.split(':'),prod=parts[0],st=parts[1]||null;
-    if(!RADAR_PRODUCTS.hasOwnProperty(prod))return;
+    if(!RADAR_PRODUCTS.hasOwnProperty(prod)&&!(window.G_RADAR&&G_RADAR[prod]))return;
     _radarProduct=prod;
     if(st&&/^[A-Z]{4}$/.test(st)&&_radarStation===null){
       var s=_stationById(st);
@@ -908,258 +863,9 @@ function loadStationsData(){
       var c=f.geometry&&f.geometry.coordinates,id=f.properties&&f.properties.id;
       return(c&&id&&/^[A-Z]{4}$/.test(id))?[id,f.properties.name||id,c[1],c[0]]:null;
     }).filter(Boolean);
-    if(live.length>100){_nexradStations=live;if(_showStations)_renderStationMarkers();}
+    if(live.length>100){_nexradStations=live;if(typeof _gRenderStations==='function')_gRenderStations();}
   }).catch(function(){}).then(function(){if(to)clearTimeout(to);});
 }
-function initRadarMap(){
-  radarReady=true;
-  _restoreRadarUrl();
-  radarMap=L.map(document.getElementById('radar-map'),{zoomControl:true,attributionControl:false,tap:false,preferCanvas:true}).setView([39.5,-98.35],4);
-  radarMap.createPane('radarPane');radarMap.getPane('radarPane').style.zIndex=350;
-  /* Esri dark-gray canvas: keyless (CARTO raster tiles now require an API key and show a watermark without one). */
-  var ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_';
-  radarMap.createPane('labelPane');radarMap.getPane('labelPane').style.zIndex=450;radarMap.getPane('labelPane').style.pointerEvents='none';
-  L.tileLayer(ESRI+'Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:12,maxNativeZoom:16,detectRetina:false,attribution:'Esri, HERE, Garmin, &copy; OpenStreetMap'}).addTo(radarMap);
-  L.tileLayer(ESRI+'Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:12,maxNativeZoom:16,detectRetina:false,pane:'labelPane'}).addTo(radarMap);
-  L.control.attribution({prefix:false,position:'bottomright'}).addTo(radarMap);
-  _radarScope=(_radarLat===null)?'national':'local';
-  if(_radarLat!==null)document.getElementById('radar-ph').style.display='none';
-  _applyRadarProduct(true);
-  loadStationsData();
-  if(_rvRefreshTimer)clearInterval(_rvRefreshTimer);
-  _rvRefreshTimer=setInterval(function(){if(radarReady&&radarMap&&!document.hidden)_applyRadarProduct(false);},RADAR_REFRESH_MS);
-}
-/* Called by the NWS tab after a forecast is acquired */
-function updateRadarLocation(lat,lon,stationId){
-  _radarLat=lat;_radarLon=lon;_radarStation=stationId||null;_radarScope='local';
-  document.getElementById('radar-info').innerHTML=(stationId?'STATION: '+stationId+'<br>':'')+'LAT: '+lat.toFixed(2)+'° LON: '+lon.toFixed(2)+'°';
-  document.getElementById('radar-ph').style.display='none';
-  if(radarReady&&radarMap){_applyRadarProduct(true);if(_showStations)_renderStationMarkers();}
-  _syncRadarUrl();
-}
-function updateStatus(message){var el=document.getElementById('radar-frame-info');if(el)el.textContent=message;}
-function _radarDot(c){if(document.getElementById('view-radar').classList.contains('active'))document.getElementById('dot').style.background=c;}
-function _setRadarTs(t){var el=document.getElementById('radar-ts');el.style.display=t?'block':'none';el.textContent=t||'';}
-/* Remove every product layer and stop the loop — prevents stale layers when switching products */
-function cleanupRadarLayer(){
-  _radarLoadSeq++;
-  if(_rvTimer){clearInterval(_rvTimer);_rvTimer=null;}
-  if(radarMap){_rvLayers.forEach(function(l){radarMap.removeLayer(l);});}
-  _rvLayers=[];_rvFrames=[];
-  if(_radarLayer&&radarMap){radarMap.removeLayer(_radarLayer);}
-  _radarLayer=null;
-}
-/* Adds the first tile source that actually serves tiles; falls through on repeated errors */
-function _addTileChain(sources,label,onFail){
-  var seq=_radarLoadSeq,i=0;
-  function next(){
-    if(seq!==_radarLoadSeq)return;
-    if(i>=sources.length){_radarLayer=null;if(onFail)onFail();return;}
-    var src=sources[i++],ok=0,bad=0;
-    var opts={opacity:src.opacity||0.75,maxZoom:12,maxNativeZoom:src.maxNativeZoom||12,pane:'radarPane',crossOrigin:false};
-    var lyr=src.wms?L.tileLayer.wms(src.url,Object.assign({layers:src.layers,format:'image/png',transparent:true,version:'1.3.0'},opts))
-                   :L.tileLayer(src.url+(src.url.indexOf('?')<0?'?':'&')+'_='+_cacheBust(),opts);
-    lyr.on('tileload',function(){ok++;});
-    lyr.on('tileerror',function(){bad++;if(ok===0&&bad>=3&&_radarLayer===lyr){radarMap.removeLayer(lyr);_radarLayer=null;next();}});
-    _radarLayer=lyr.addTo(radarMap);
-    _setRadarTs(label+' // '+src.name);
-  }
-  next();
-}
-function _setView(recenter){
-  if(!recenter)return;
-  if(_radarScope==='national'||_radarLat===null)radarMap.setView([39.5,-98.35],4);
-  else radarMap.setView([_radarLat,_radarLon],7);
-}
-function _applyRadarProduct(recenter){
-  if(!radarMap)return;
-  _updateRadarProductUI();
-  if(document.getElementById('view-radar').classList.contains('active'))setSys('* SYS: NOMINAL<br>* SRC: '+_radarSrcTxt()+'<br>* STATION: '+(_radarStation||'IDLE'));
-  _setView(recenter);
-  cleanupRadarLayer();_radarLoadedAt=Date.now();_radarDot('#22c55e');
-  var stTag=_radarScope==='national'?'NATIONAL':(_radarStation||'LOCAL');
-  if(_radarProduct==='bref_qcd'){_loadRadarLoop();return;}
-  if(_radarProduct==='hrrr'){_loadHrrrLoop();return;}
-  var prod=RADAR_PRODUCTS[_radarProduct];
-  if(prod.station&&!_radarStation){
-    _setRadarTs(prod.name+' // SELECT A STATION');
-    updateStatus('SELECT A STATION: TAP ONE OF THE ◎ STATIONS ON THE MAP');
-    if(!_showStations)toggleRadarStations();
-    return;
-  }
-  if(_radarProduct==='srv'){
-    updateStatus('SRC: IEM RIDGE '+_radarStation+' STORM-RELATIVE VELOCITY — REFRESHES EVERY 5 MIN');
-    _addTileChain([{name:'IEM RIDGE N0S',url:IEM_TILE+'ridge::'+_ridgeSite(_radarStation)+'-N0S-0/{z}/{x}/{y}.png',opacity:0.8}],
-      'STORM-REL VELOCITY // '+_radarStation,function(){_radarDot('#ff4444');_setRadarTs('STORM-REL VELOCITY // '+_radarStation+' UNAVAILABLE');updateStatus('STORM-RELATIVE VELOCITY FOR '+_radarStation+' IS UNAVAILABLE RIGHT NOW — TRY A NEARBY STATION');});
-    return;
-  }
-  if(_radarProduct==='hhc'){
-    var ws=_radarStation.toLowerCase();
-    updateStatus('SRC: NWS '+_radarStation+' HYDROMETEOR CLASSIFICATION (LOWEST TILT) — REFRESHES EVERY 5 MIN');
-    _addTileChain([{name:'NWS '+_radarStation+' HC',wms:true,url:'https://opengeo.ncep.noaa.gov/geoserver/'+ws+'/ows',layers:ws+'_bdhc',opacity:0.8}],
-      'HYDROMETEOR CLASS // '+_radarStation,function(){_radarDot('#ff4444');_setRadarTs('HYDROMETEOR CLASS // '+_radarStation+' UNAVAILABLE');updateStatus('DUAL-POL DATA FOR '+_radarStation+' IS UNAVAILABLE RIGHT NOW — TRY A NEARBY STATION');});
-    return;
-  }
-  if(prod.layer){
-    updateStatus(prod.name+' — NOAA MRMS RADAR-ONLY ESTIMATE — '+(_radarProduct==='qpe1h'?'UPDATES EVERY FEW MIN':'UPDATES HOURLY'));
-    _addTileChain([{name:'MRMS '+prod.layer.toUpperCase(),url:IEM_TILE+prod.layer+'-900913/{z}/{x}/{y}.png',opacity:0.7}],
-      prod.name+' // '+stTag,function(){_radarDot('#ff4444');_setRadarTs(prod.name+' // UNAVAILABLE');updateStatus('MRMS RAINFALL TILES UNREACHABLE');});
-    return;
-  }
-  if(_radarProduct==='vel_qcd'){
-    updateStatus('SRC: IEM RIDGE '+_radarStation+' BASE VELOCITY — REFRESHES EVERY 5 MIN');
-    _addTileChain([
-      {name:'IEM RIDGE N0U',url:getRadarTileUrl(_radarStation,'velocity'),opacity:0.8},
-      {name:'IEM RIDGE N0U',url:IEM_TILE+'ridge::'+_radarStation+'-N0U-0/{z}/{x}/{y}.png',opacity:0.8}
-    ],'BASE VELOCITY // '+_radarStation,function(){_radarDot('#ff4444');_setRadarTs('BASE VELOCITY // '+_radarStation+' UNAVAILABLE');updateStatus('VELOCITY FOR '+_radarStation+' IS UNAVAILABLE RIGHT NOW — TRY A NEARBY STATION');});
-    return;
-  }
-  if(_radarProduct==='cref_qcd'){
-    updateStatus('COMPOSITE REFLECTIVITY — CURRENT SCAN — REFRESHES EVERY 5 MIN');
-    _addTileChain([
-      {name:'MRMS CREF',wms:true,url:'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_cref_qcd/ows',layers:'conus_cref_qcd',opacity:0.75},
-      {name:'IEM NEXRAD N0Q',url:IEM_TILE+'nexrad-n0q-900913/{z}/{x}/{y}.png'}
-    ],'COMP REFL // '+stTag,function(){_radarDot('#ff4444');_setRadarTs('COMP REFL // UNAVAILABLE');updateStatus('COMPOSITE SOURCES UNREACHABLE');});
-    return;
-  }
-  if(_radarProduct==='eet'){
-    updateStatus('ENHANCED ECHO TOPS — CURRENT SCAN — REFRESHES EVERY 5 MIN');
-    var srcs=[{name:'IEM NEXRAD EET',url:IEM_TILE+'nexrad-eet-900913/{z}/{x}/{y}.png'}];
-    if(_radarStation&&_radarScope==='local')srcs.push({name:'IEM RIDGE EET',url:getRadarTileUrl(_radarStation,'echotops')});
-    _addTileChain(srcs,'ECHO TOPS // '+stTag,function(){_radarDot('#ff4444');_setRadarTs('ECHO TOPS // UNAVAILABLE');updateStatus('ECHO TOPS UNREACHABLE');});
-  }
-}
-/* Animated base reflectivity loop. IEM NEXRAD composites (now and 5–50 min ago) first: full resolution
-   and no rate limit. RainViewer is the fallback; its free tier stops at zoom 7 and allows 100 requests
-   per minute per IP, which a 13-frame loop exceeds (tiles drop out as blank rectangles). */
-function _loadRadarLoop(){
-  var seq=_radarLoadSeq,done=false;
-  updateStatus('LOADING RADAR LOOP...');
-  function iem(){
-    if(done||seq!==_radarLoadSeq)return;done=true;
-    var now=Date.now(),frames=[];
-    for(var m=50;m>=0;m-=5){frames.push({time:now-m*60000,url:IEM_TILE+'nexrad-n0q-900913'+(m?'-m'+(m<10?'0':'')+m+'m':'')+'/{z}/{x}/{y}.png?_='+_cacheBust(),maxNativeZoom:12});}
-    _startLoop(frames,'IEM NEXRAD');
-  }
-  function rainviewer(){
-    if(done||seq!==_radarLoadSeq)return;done=true;
-    fetch('https://api.rainviewer.com/public/weather-maps.json').then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(data){
-      if(seq!==_radarLoadSeq)return;
-      var host=data.host||'https://tilecache.rainviewer.com',frames=((data.radar&&data.radar.past)||[]).slice(-6);
-      if(!frames.length)throw new Error('empty');
-      _radarDot('#ffb400');
-      _startLoop(frames.map(function(f){return{time:f.time*1000,url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maxNativeZoom:7};}),'RAINVIEWER');
-    }).catch(function(){if(seq!==_radarLoadSeq)return;done=false;iem();});
-  }
-  var probe=new Image(),t=setTimeout(rainviewer,8000);
-  probe.onload=function(){clearTimeout(t);iem();};
-  probe.onerror=function(){clearTimeout(t);rainviewer();};
-  probe.src=IEM_TILE+'nexrad-n0q-900913/0/0/0.png?_='+_cacheBust();
-}
-/* HRRR forecast reflectivity ("future radar"): hourly frames from now to the end of the latest run (18 h).
-   IEM publishes the run's init time; frames already in the past are skipped. */
-function _loadHrrrLoop(){
-  var seq=_radarLoadSeq;
-  updateStatus('LOADING HRRR FORECAST...');
-  function build(init){
-    if(seq!==_radarLoadSeq)return;
-    var now=Date.now(),frames=[];
-    for(var m=60;m<=1080&&frames.length<12;m+=60){
-      var vt=init?init+m*60000:null;
-      if(vt&&vt<now-30*60000)continue;
-      var mm=('000'+m).slice(-4);
-      frames.push({time:vt||now,label:'+'+(m/60)+'H'+(vt?' — VALID '+new Date(vt).toISOString().slice(11,16)+' UTC':' FROM MODEL RUN'),
-        url:IEM_TILE+'hrrr::REFD-F'+mm+'-0/{z}/{x}/{y}.png?_='+_cacheBust(),maxNativeZoom:10});
-    }
-    _startLoop(frames,'HRRR FORECAST'+(init?' (RUN '+new Date(init).toISOString().slice(11,13)+'Z)':''));
-  }
-  fetch('https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_0060.json').then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
-    .then(function(j){var t=Date.parse(j.model_init_utc);build(isNaN(t)?null:t);}).catch(function(){build(null);});
-}
-function _startLoop(frames,src){
-  _rvFrames=frames;_rvPaused=false;
-  _rvLayers=frames.map(function(f){
-    return L.tileLayer(f.url,{tileSize:256,opacity:0,maxZoom:12,maxNativeZoom:f.maxNativeZoom,pane:'radarPane',updateWhenIdle:true,keepBuffer:1}).addTo(radarMap);
-  });
-  _rvSrc=src;
-  _rvIdx=frames.length-1;_showRVFrame(_rvIdx);
-  _rvTimer=setInterval(_rvStep,500);
-}
-var _rvSrc='';
-function _rvStep(){if(_rvPaused||!_rvFrames.length||document.hidden)return;_rvIdx=(_rvIdx+1)%_rvFrames.length;_showRVFrame(_rvIdx);}
-function _showRVFrame(idx){
-  if(!_rvFrames.length||!radarMap||!_rvLayers.length)return;
-  var prev=_rvLayers._shown;
-  if(prev!==undefined&&_rvLayers[prev])_rvLayers[prev].setOpacity(0);
-  _rvLayers[idx].setOpacity(0.65);_rvLayers._shown=idx;
-  var ts=_rvFrames[idx].label||(new Date(_rvFrames[idx].time).toISOString().split('T')[1].slice(0,5)+' UTC');
-  var txt='FRAME '+(idx+1)+'/'+_rvFrames.length+' — '+ts;
-  _setRadarTs(_rvSrc+' // '+txt);
-  document.getElementById('radar-frame-info').textContent=txt+(_rvPaused?' (PAUSED)':'');
-}
-function radarPlay(){
-  _rvPaused=false;
-  if(!RADAR_PRODUCTS[_radarProduct].loop){setRadarProduct('bref_qcd');return;}
-  if(!_rvTimer&&_rvFrames.length)_rvTimer=setInterval(_rvStep,500);
-  _radarPlayBtn();
-}
-function radarToggle(){if(RADAR_PRODUCTS[_radarProduct].loop&&_rvFrames.length&&!_rvPaused)radarPause();else radarPlay();}
-function _radarPlayBtn(){var b=document.getElementById('rsc-play');if(b){b.style.display=RADAR_PRODUCTS[_radarProduct].loop?'':'none';b.textContent=_rvPaused?'▶':'❚❚';}}
-function radarPause(){_rvPaused=true;if(_rvFrames.length)_showRVFrame(_rvIdx);_radarPlayBtn();}
-function setRadarProduct(prod){
-  _radarProduct=prod;
-  _applyRadarProduct(false);
-  if(_showStations)_renderStationMarkers();
-  _syncRadarUrl();
-  if(typeof switchTab==='function'&&document.getElementById('view-radar').classList.contains('active'))
-    setSys('* SYS: NOMINAL<br>* SRC: '+_radarSrcTxt()+'<br>* STATION: '+(_radarStation||'IDLE'));
-}
-function setRadarScope(scope){_radarScope=scope;_applyRadarProduct(true);}
-function handleStationSelect(stationId,stationName,lat,lon){
-  _radarStation=stationId;_radarLat=lat;_radarLon=lon;_radarScope='local';
-  document.getElementById('radar-info').innerHTML='STATION: '+stationId+(stationName?' — '+stationName:'')+'<br>LAT: '+lat.toFixed(2)+'° LON: '+lon.toFixed(2)+'°';
-  document.getElementById('radar-ph').style.display='none';
-  _applyRadarProduct(true);
-  if(_showStations)_renderStationMarkers();
-  _syncRadarUrl();
-}
-function _updateRadarProductUI(){
-  function style(el,active,disabled){
-    el.style.background=active?'rgba(255,180,0,.28)':'rgba(255,180,0,.05)';
-    el.style.color=active?'#ffb400':'rgba(255,180,0,.55)';
-    el.style.borderColor=active?'#ffb400':'rgba(255,180,0,.25)';
-    el.style.opacity=disabled?'0.35':'1';
-    el.style.pointerEvents=disabled?'none':'auto';
-  }
-  /* Station products stay selectable: with no station they open the station picker */
-  var sel=document.getElementById('radar-prod');if(sel&&sel.value!==_radarProduct)sel.value=_radarProduct;
-  _renderRadarLegend();
-  ['national','local'].forEach(function(s){var el=document.getElementById('rsc-'+s);if(el)style(el,s===_radarScope,s==='local'&&_radarLat===null);});
-  var sBtn=document.getElementById('rsc-stations');if(sBtn)style(sBtn,_showStations,false);
-  _radarPlayBtn();
-}
-function toggleRadarStations(){
-  _showStations=!_showStations;
-  if(_showStations)_renderStationMarkers();
-  else if(_stationMarkers){radarMap.removeLayer(_stationMarkers);_stationMarkers=null;}
-  _updateRadarProductUI();
-}
-function _renderStationMarkers(){
-  if(!radarMap)return;
-  if(_stationMarkers)radarMap.removeLayer(_stationMarkers);
-  _stationMarkers=L.layerGroup().addTo(radarMap);
-  _nexradStations.forEach(function(s){
-    var id=s[0],name=s[1],lat=s[2],lon=s[3],isActive=(id===_radarStation),sz=isActive?16:12;
-    /* 28px invisible hit area around each diamond so stations are tappable on a phone */
-    var icon=L.divIcon({className:'',iconSize:[28,28],iconAnchor:[14,14],
-      html:'<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer"><div style="width:'+sz+'px;height:'+sz+'px;background:'+(isActive?'#ffb400':'rgba(255,180,0,.25)')+';border:'+(isActive?2:1)+'px solid #ffb400;transform:rotate(45deg)"></div></div>'});
-    var m=L.marker([lat,lon],{icon:icon,zIndexOffset:isActive?1000:0,keyboard:false});
-    m.bindTooltip(id+'<br><span style="opacity:.7;font-size:9px">'+String(name).replace(/[<>&]/g,'')+'</span>',{direction:'top',opacity:1,className:'leaflet-tooltip',offset:[0,-10]});
-    m.on('click',function(e){L.DomEvent.stopPropagation(e);handleStationSelect(id,name,lat,lon);});
-    m.addTo(_stationMarkers);
-  });
-}
-
 /* ═══════════════════════ EXTRA SATELLITES ═══════════════════════ */
 
 var _hardcodedTLEs={

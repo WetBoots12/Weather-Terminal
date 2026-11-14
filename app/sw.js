@@ -1,4 +1,4 @@
-const CACHE = 'goes-star-v11';
+const CACHE = 'goes-star-v12';
 const ASSETS = [
   './index.html',
   './guide.js',
@@ -7,8 +7,6 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './globe.js',
-  './vendor/leaflet.js',
-  './vendor/leaflet.css',
   './vendor/satellite.min.js',
   './vendor/fonts/jetbrains-mono-400.woff2',
   './vendor/fonts/jetbrains-mono-700.woff2'
