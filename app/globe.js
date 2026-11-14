@@ -94,7 +94,7 @@ function _gBuild(){
   if(_G.pending){var pp=_G.pending;_G.pending=null;_gFlyTo(pp[0],pp[1],pp[2]);}
   _G.refresh=setInterval(function(){
     if(document.hidden||!_gVisible())return;
-    if(_gOpts.mode==='radar'&&Date.now()-(_G.radarAt||0)>300000)_gRadar();
+    if(_gOpts.mode==='radar'&&Date.now()-(_G.radarAt||0)>300000)_gRadar(true);
     if(_gOpts.mode==='goes'&&Date.now()-(_G.goesAt||0)>600000)_gGoes();
   },30000);
   setInterval(function(){if(!_gVisible()||document.hidden)return;_gUpdateLEO();_gSunInfo();_gRender();},1000);
@@ -135,7 +135,8 @@ function _gApplyTerrain(){if(!_G.v)return;_G.v.terrainProvider=(_gOpts.terrain&&
 function _gApplyOpacity(){
   var a=_gOpts.opacity/100;
   _G.goes.forEach(function(l){l.alpha=a;l.show=!_diskOverlayActive;});
-  _G.radar.forEach(function(l,i){l.alpha=Math.min(1,a+.15);l.show=(i===_G.radarIdx);});
+  /* radar frames stay shown (tiles stay loaded); the loop animates alpha, and Cesium skips alpha-0 layers when drawing */
+  var ra=Math.min(1,a+.15);_G.radar.forEach(function(l,i){l.show=!l._pre;l.alpha=(i===_G.radarIdx)?ra:0;});
   if(_diskOverlayActive)_gDiskTick(true);
 }
 function _gRaise(){/* keep labels above the weather layers */var il=_G.v.imageryLayers;il.raiseToTop(_G.layers.places);il.raiseToTop(_G.layers.roads);}
@@ -303,25 +304,53 @@ function _gConus(){return _CONUS||(_CONUS=Cesium.Rectangle.fromDegrees(-127,20,-
 function _gStRect(){var s=_stationById(_radarStation),la=s?s[2]:(_radarLat||39),lo=s?s[3]:(_radarLon||-98);return Cesium.Rectangle.fromDegrees(lo-5.5,la-4.5,lo+5.5,la+4.5);}
 function _gTile(url,max,rect,credit){return new Cesium.UrlTemplateImageryProvider({url:url+(url.indexOf('?')<0?'?':'&')+'_='+_cacheBust(),maximumLevel:max,rectangle:rect,credit:credit});}
 function _gWms(url,layers,rect,credit,extra){return new Cesium.WebMapServiceImageryProvider({url:url,layers:layers,rectangle:rect,maximumLevel:10,credit:credit,parameters:Object.assign({transparent:true,format:'image/png',version:'1.3.0'},extra||{})});}
-function _gClearRadar(){if(_G.radarTimer){clearInterval(_G.radarTimer);_G.radarTimer=null;}_G.radar.forEach(function(l){_G.v.imageryLayers.remove(l,true);});_G.radar=[];_G.radarIdx=0;_G.radarFrames=[];}
-function _gRadar(){
-  if(!_G.v)return;_gClearRadar();_G.radarAt=_radarLoadedAt=Date.now();var C=Cesium,seq=_G.radarSeq=(_G.radarSeq||0)+1,key=_gOpts.radar,P=_gRP(key);
+function _gStopLoop(){if(_G.radarTimer){clearInterval(_G.radarTimer);_G.radarTimer=null;}if(_G.radarFade){cancelAnimationFrame(_G.radarFade);_G.radarFade=0;}if(_G.radarWait){_G.radarWait();_G.radarWait=null;}}
+/* resolve when the globe's tile queue drains (or after ms) */
+function _gWhenLoaded(ms,cb){var g=_G.v.scene.globe,done=0,rm,to;
+  function fin(){if(done)return;done=1;if(rm)rm();clearTimeout(to);_G.radarWait=null;cb();}
+  rm=g.tileLoadProgressEvent.addEventListener(function(n){if(n===0)setTimeout(function(){if(g.tilesLoaded)fin();},50);});
+  to=setTimeout(fin,ms);_G.radarWait=function(){done=1;if(rm)rm();clearTimeout(to);};_gRender();}
+/* crossfade from the current frame to frame j */
+function _gFadeTo(j){var from=_G.radar[_G.radarIdx],to=_G.radar[j],ra=Math.min(1,_gOpts.opacity/100+.15),t0=performance.now(),D=280;
+  _G.radarIdx=j;_gFrameInfo();if(!from||!to||from===to){_gApplyOpacity();_gRender();return;}
+  if(_G.radarFade)cancelAnimationFrame(_G.radarFade);
+  (function step(){var k=Math.min(1,(performance.now()-t0)/D);from.alpha=ra*(1-k);to.alpha=ra*k;_gRender();
+    _G.radarFade=k<1?requestAnimationFrame(step):0;if(k>=1)_gApplyOpacity();})();}
+function _gClearRadar(){_gStopLoop();_G.radar.forEach(function(l){_G.v.imageryLayers.remove(l,true);});_G.radar=[];_G.radarIdx=0;_G.radarFrames=[];tslSet('gl-rsl',0);}
+/* drag the radar time slider: pause, release any frames still waiting to buffer, jump to the frame */
+function radarScrub(v){if(!_G.radar.length)return;if(_gOpts.loop)radarPause();if(_G.radarFade){cancelAnimationFrame(_G.radarFade);_G.radarFade=0;}
+  _G.radar.forEach(function(l){l._pre=false;});_G.radarIdx=Math.min(+v,_G.radar.length-1);_gApplyOpacity();_gFrameInfo();_gRender();}
+function _gRadar(soft){
+  if(!_G.v)return;soft=soft&&_G.radar.length>1&&_gOpts.mode==='radar';if(!soft)_gClearRadar();_G.radarAt=_radarLoadedAt=Date.now();var C=Cesium,seq=_G.radarSeq=(_G.radarSeq||0)+1,key=_gOpts.radar,P=_gRP(key);
   _radarProduct=key;
   _gRadarUI();
   if(_gOpts.mode!=='radar'){_gRadarInfo('');_gTs('');_gRender();return;}
-  var play=!!(P.loop&&_gOpts.loop),stTag=_radarScope==='national'?'NATIONAL':(_radarStation||'LOCAL');
+  var play=!!P.loop,stTag=_radarScope==='national'?'NATIONAL':(_radarStation||'LOCAL');
   /* sources: list of alternatives; each is a function returning frames [{t,label,p}] or a promise of them */
   function show(frames,src,fallback){
     if(seq!==_G.radarSeq)return;
-    if(!frames||!frames.length){if(fallback)return fallback();_gFail(P.name+' UNAVAILABLE');return;}
-    _G.radarFrames=frames;_G.radarSrc=src;
-    _G.radar=frames.map(function(f){var l=_G.v.imageryLayers.addImageryProvider(f.p);l.show=false;return l;});
-    _G.radarIdx=frames.length-1;_gApplyOpacity();_gRaise();_gFrameInfo();
+    if(!frames||!frames.length){if(soft)return;if(fallback)return fallback();_gFail(P.name+' UNAVAILABLE');return;}
+    /* a background refresh keeps frames it already has (same key) so the loop doesn't flash or refetch */
+    var old={},il=_G.v.imageryLayers,last=frames.length-1;
+    if(soft){_gStopLoop();_G.radarFrames.forEach(function(f,i){if(f.k)old[f.k]=_G.radar[i];});_G.radar.forEach(function(l,i){var f=_G.radarFrames[i];if(!f||!f.k||!frames.some(function(n){return n.k===f.k;}))il.remove(l,true);});}
+    var srcChanged=_G.radarSrc!==src;_G.radarFrames=frames;_G.radarSrc=src;if(srcChanged)_gRadarUI();
+    /* the newest frame loads first; the older frames preload only once it is on screen */
+    var keep=-1;_G.radar=frames.map(function(f,i){var o=f.k&&old[f.k],l=o||il.addImageryProvider(f.p);if(o)keep=i;else l._pre=soft||(i!==last);return l;});
+    /* on refresh, stay on the newest frame already loaded until the new frames have buffered */
+    if(soft&&keep<0)_G.radar[last]._pre=false;
+    _G.radarIdx=soft&&keep>=0?keep:last;_gApplyOpacity();_gRaise();_gFrameInfo();
     /* fall through to the next source if the shown layer keeps failing before any tile loads */
-    if(fallback){var bad=0,ok=0,last=frames[frames.length-1].p;
-      if(last.errorEvent)last.errorEvent.addEventListener(function(){if(ok||seq!==_G.radarSeq)return;if(++bad===6){_gClearRadar();fallback();}});
+    if(fallback&&!soft){var bad=0,ok=0,lp=frames[last].p;
+      if(lp.errorEvent)lp.errorEvent.addEventListener(function(){if(ok||seq!==_G.radarSeq)return;if(++bad===6){_gClearRadar();fallback();}});
       setTimeout(function(){ok=1;},9000);}
-    if(frames.length>1){var dwell=0;_G.radarTimer=setInterval(function(){if(!_gVisible()||!_gOpts.loop)return;if(_G.radarIdx===frames.length-1&&dwell++<3)return;dwell=0;_G.radarIdx=(_G.radarIdx+1)%frames.length;_gApplyOpacity();_gFrameInfo();_gRender();},500);}
+    if(frames.length>1){
+      var startLoop=function(){var dwell=0;_G.radarTimer=setInterval(function(){if(!_gVisible()||!_gOpts.loop||_G.radarSeq!==seq)return;if(_G.radarIdx===last&&dwell++<3)return;dwell=0;_gFadeTo((_G.radarIdx+1)%frames.length);},600);};
+      var pend=_G.radar.filter(function(l){return l._pre;});
+      if(!pend.length)startLoop();
+      else _gWhenLoaded(3000,function(){if(seq!==_G.radarSeq)return;pend.forEach(function(l){l._pre=false;});_gApplyOpacity();
+        _gRadarInfo('BUFFERING '+frames.length+' FRAMES…');
+        _gWhenLoaded(8000,function(){if(seq!==_G.radarSeq)return;_gFrameInfo();startLoop();});});
+    }
     _gRender();
   }
   function iemLoop(){var fr=[];for(var m=play?50:0;m>=0;m-=5)fr.push({t:Date.now()-m*60000,p:_gTile(IEM_TILE+'nexrad-n0q-900913'+(m?'-m'+(m<10?'0':'')+m+'m':'')+'/{z}/{x}/{y}.png',10,_gConus(),'Radar: NOAA NEXRAD via Iowa Environmental Mesonet')});return fr;}
@@ -329,8 +358,8 @@ function _gRadar(){
     fetch(url).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){
       var past=((d.radar&&d.radar.past)||[]).slice(play?-6:-1);if(!past.length)throw 0;
       var host=d.host||(url.indexOf('rainviewer')>0?'https://tilecache.rainviewer.com':url.replace(/\/public\/weather-maps\.json$/,''));
-      show(past.map(function(f){return{t:f.time*1000,p:new C.UrlTemplateImageryProvider({url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maximumLevel:max,credit:credit})};}),name,fb);
-    }).catch(function(){if(seq!==_G.radarSeq)return;if(fb)fb();else _gFail(name+' UNREACHABLE');});
+      show(past.map(function(f){return{t:f.time*1000,k:host+f.path,p:new C.UrlTemplateImageryProvider({url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maximumLevel:max,credit:credit})};}),name,fb);
+    }).catch(function(){if(seq!==_G.radarSeq||soft)return;if(fb)fb();else _gFail(name+' UNREACHABLE');});
   }
   function rainviewer(){rvJson('https://api.rainviewer.com/public/weather-maps.json','RAINVIEWER','Radar: RainViewer',7,null);}
   function needStation(){
@@ -345,7 +374,7 @@ function _gRadar(){
     case 'global':rainviewer();break;
     case 'bref_qcd':show(iemLoop(),'IEM NEXRAD',rainviewer);break;
     case 'eccc':(function(){var fr=[],base=Math.floor((Date.now()-6*60000)/360000)*360000;
-      for(var k=play?8:0;k>=0;k--){var tt=base-k*360000;fr.push({t:tt,p:_gWms('https://geo.weather.gc.ca/geomet','RADAR_1KM_RRAI',C.Rectangle.fromDegrees(-170,15,-45,85),'Radar: Environment and Climate Change Canada (MSC GeoMet)',play?{time:new Date(tt).toISOString().slice(0,19)+'Z'}:null)});}
+      for(var k=play?8:0;k>=0;k--){var tt=base-k*360000;fr.push({t:tt,p:_gWms('https://geo.weather.gc.ca/geomet','RADAR_1KM_RRAI',C.Rectangle.fromDegrees(-170,15,-45,85),'Radar: Environment and Climate Change Canada (MSC GeoMet)',Object.assign({styles:'Radar-Rain_14colors'},play?{time:new Date(tt).toISOString().slice(0,19)+'Z'}:null))});}
       show(fr,'ECCC GEOMET');})();break;
     case 'hrrr':
       fetch('https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_0060.json').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){var t=Date.parse(j.model_init_utc);return isNaN(t)?null:t;}).catch(function(){return null;}).then(function(init){
@@ -356,6 +385,8 @@ function _gRadar(){
       });break;
     case 'cref_qcd':
       show([{t:Date.now(),p:_gWms('https://opengeo.ncep.noaa.gov/geoserver/conus/conus_cref_qcd/ows','conus_cref_qcd',_gConus(),'Radar: NOAA MRMS')}],'NOAA MRMS',function(){show([{t:Date.now(),p:_gTile(IEM_TILE+'nexrad-n0q-900913/{z}/{x}/{y}.png',10,_gConus(),'Radar: NOAA NEXRAD via IEM')}],'IEM NEXRAD');});break;
+    case 'ptype':
+      show([{t:Date.now(),p:_gWms('https://opengeo.ncep.noaa.gov/geoserver/conus/ows','conus_pcpn_typ',_gConus(),'Precip type: NOAA MRMS')}],'NOAA MRMS');break;
     case 'eet':
       show([{t:Date.now(),p:_gTile(IEM_TILE+'nexrad-eet-900913/{z}/{x}/{y}.png',10,_gConus(),'Echo tops: NOAA NEXRAD via IEM')}],'IEM NEXRAD EET',(_radarStation&&_radarScope==='local')?function(){show([{t:Date.now(),p:_gTile(getRadarTileUrl(_radarStation,'echotops'),10,_gStRect(),'Echo tops: NOAA NEXRAD via IEM')}],'IEM RIDGE '+_radarStation);}:null);break;
     case 'vel_qcd':if(needStation())break;
@@ -377,6 +408,7 @@ function _gFrameInfo(){
   var f=_G.radarFrames[_G.radarIdx];if(!f)return;var n=_G.radarFrames.length,P=_gRP(_gOpts.radar);
   var ts=f.label||(new Date(f.t).toISOString().slice(11,16)+' UTC'),txt=(n>1?'FRAME '+(_G.radarIdx+1)+'/'+n+' — ':'')+ts;
   _gTs(P.name+' // '+_G.radarSrc+' // '+txt);_gRadarInfo(txt+(n>1&&!_gOpts.loop?' (PAUSED)':''));
+  tslSet('gl-rsl',n,_G.radarIdx,(n>1?(_G.radarIdx+1)+'/'+n+' — ':'')+ts,_gOpts.loop);
 }
 function _gTs(t){var el=document.getElementById('gl-ts');if(el){el.style.display=t?'block':'none';el.textContent=t;}}
 function _gRadarInfo(t){var el=document.getElementById('glRadarInfo');if(el)el.innerHTML=t;}
@@ -385,19 +417,23 @@ function _gRadarUI(){
   var on=_gOpts.mode==='radar',bar=document.getElementById('gl-radar-bar');if(bar)bar.style.display=on?'flex':'none';
   var P=_gRP(_gOpts.radar),sel=document.getElementById('glRadar');if(sel&&sel.value!==_gOpts.radar)sel.value=_gOpts.radar;
   function st(id,active,dis){var el=document.getElementById(id);if(!el)return;el.classList.toggle('on',!!active);el.disabled=!!dis;}
-  var pb=document.getElementById('gl-play');if(pb){pb.style.display=P.loop?'':'none';pb.textContent=_gOpts.loop?'❚❚':'▶ LOOP';pb.title=_gOpts.loop?'Pause':'Play the recent frames';}
   st('gl-nat',_radarScope==='national');st('gl-loc',_radarScope==='local',_radarLat===null&&!_radarStation);st('gl-st',_showStations);
   var info=document.getElementById('radar-info');
   if(info){var s=_stationById(_radarStation);info.innerHTML=(_radarStation?'STATION: '+_radarStation+(s?' — '+_esc(s[1]):'')+'<br>':'')+(_radarLat!==null?'LAT: '+_radarLat.toFixed(2)+'° LON: '+_radarLon.toFixed(2)+'°':'NO LOCATION — SET ONE ON NWS GROUND OR PICK A STATION');}
   /* legend */
   var el=document.getElementById('radar-legend');if(!el)return;
-  var L=on&&RADAR_LEGENDS[(RADAR_PRODUCTS[_gOpts.radar]||{}).legend];
-  if(on&&!L&&G_RADAR[_gOpts.radar]){el.innerHTML='<div class="rl-hd"><span>'+(_gOpts.radar==='eccc'?'RAIN RATE (MSC GEOMET SCALE)':'REFLECTIVITY (UNIVERSAL BLUE SCALE)')+'</span><span>'+(_gOpts.radar==='eccc'?'MM/H':'dBZ')+'</span></div><div class="rl-note">LIGHT = PALE / BLUE // HEAVY = YELLOW-RED // SEE GUIDE</div>';el.style.display='block';return;}
+  /* the global mosaics (and the IEM product when it falls back to RainViewer) use the Universal Blue rain/snow scales */
+  var lk=(RADAR_PRODUCTS[_gOpts.radar]||G_RADAR[_gOpts.radar]||{}).legend||(_gOpts.radar==='eccc'?'eccc':G_RADAR[_gOpts.radar]?'rvub':'');
+  if(_gOpts.radar==='bref_qcd'&&_G.radarSrc==='RAINVIEWER')lk='rvub';
+  var L=on&&RADAR_LEGENDS[lk];
   if(!L){el.style.display='none';return;}
-  var h='<div class="rl-hd"><span>'+L.t+'</span><span>'+(L.u||'')+'</span></div>';
-  if(L.cats)h+='<div class="rl-cats">'+L.cats.map(function(c){return'<span title="'+c[2]+'"><i style="background:'+c[0]+'"></i>'+c[2]+'</span>';}).join('')+'</div>';
-  else{h+='<div class="rl-bar" style="background:linear-gradient(to right,'+L.g+')"></div><div class="rl-ticks">'+L.ticks.map(function(t){return'<span style="left:'+Math.min(Math.max(t[0],4),96)+'%">'+t[1]+'</span>';}).join('')+'</div>';
+  var h='<div class="rl-hd"><span>'+L.t+'</span><span>'+(L.u||'')+'</span></div>',tk=function(c){return'<div class="rl-ticks'+(c||'')+'">'+L.ticks.map(function(t){return'<span style="left:'+Math.min(Math.max(t[0],4),96)+'%">'+t[1]+'</span>';}).join('')+'</div>';};
+  if(L.img)h+='<img src="'+L.img+'" alt="'+L.t+' legend" onerror="this.outerHTML=\'<div class=rl-note>LEGEND IMAGE UNAVAILABLE OFFLINE</div>\'">';
+  else if(L.bars)h+=L.bars.map(function(b){return'<div class="rl-bl"><b>'+b[0]+'</b><div class="rl-bar" style="background:linear-gradient(to right,'+b[1]+')"></div></div>';}).join('')+tk(' rl-pad');
+  else if(L.cats)h+='<div class="rl-cats">'+L.cats.map(function(c){return'<span title="'+c[2]+'"><i style="background:'+c[0]+'"></i>'+c[2]+'</span>';}).join('')+'</div>';
+  else{h+='<div class="rl-bar" style="background:linear-gradient(to right,'+L.g+')"></div>'+tk();
     if(L.ends)h+='<div class="rl-ends"><span>'+L.ends[0]+'</span><span>'+L.ends[1]+'</span></div>';}
+  if(L.types)h+='<div class="rl-types">'+L.types.map(function(t){return'<div><i style="background:'+t[0]+'"></i><b>'+t[1]+'</b><span>'+t[2]+'</span></div>';}).join('')+'</div>';
   if(L.note)h+='<div class="rl-note">'+L.note+'</div>';
   el.innerHTML=h;el.style.display='block';
 }
@@ -519,7 +555,7 @@ function _gGoesInfo(t){var el=document.getElementById('glGoesInfo');if(el)el.inn
 function _gClearDisk(){_G.disk.forEach(function(l){_G.v.imageryLayers.remove(l,true);});_G.disk=[];_G.diskIdx=-1;(_G.diskUrls||[]).forEach(URL.revokeObjectURL);_G.diskUrls=[];}
 function toggleDiskTexture(){
   if(!_G.v)return;var btn=document.getElementById('diskTexBtn');
-  if(_diskOverlayActive){_diskOverlayActive=false;_gClearDisk();_gApplyOpacity();_gRender();if(btn){btn.textContent='◉ OVERLAY LIVE LOOP';btn.style.color='';}return;}
+  if(_diskOverlayActive){_diskOverlayActive=false;_gClearDisk();_imgTsl();_gApplyOpacity();_gRender();if(btn){btn.textContent='◉ OVERLAY LIVE LOOP';btn.style.color='';}return;}
   if(lastPath!=='FD'||(!animFrames.length&&!currentImgUrl))return;
   _diskOverlayActive=true;if(btn){btn.textContent='◉ LIVE LOOP: LOADING…';btn.style.color='var(--y)';}
   refreshDiskTextures(true);
@@ -538,7 +574,7 @@ function refreshDiskTextures(force){
     if(seq!==_G.diskSeq||!_diskOverlayActive)return;_gClearDisk();_G.diskUrls=[];
     frames.forEach(function(pcs){pcs.forEach(function(p){_G.diskUrls.push(p.url);});});
     _G.diskFrames=frames.map(function(pcs){return pcs.map(function(p){return _G.v.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({url:p.url,rectangle:p.rect,tileWidth:p.w,tileHeight:p.h,credit:'GOES ABI: NOAA/NESDIS STAR'}));});});
-    _G.disk=[].concat.apply([],_G.diskFrames);_G.diskIdx=-1;_gDiskTick(true);_gRaise();
+    _G.disk=[].concat.apply([],_G.diskFrames);_G.diskIdx=-1;_gDiskTick(true);_gRaise();_imgTsl();
     var btn=document.getElementById('diskTexBtn');if(btn)btn.textContent='◉ LIVE LOOP: ON';
   }).catch(function(){var btn=document.getElementById('diskTexBtn');if(btn)btn.textContent='◉ LIVE LOOP FAILED — RETRY';_diskOverlayActive=false;});
 }
