@@ -1,6 +1,6 @@
 # GOES-STAR // COMMAND (Weather Terminal)
 
-Terminal-styled weather dashboard: 3D satellite globe, animated GOES imagery, NWS forecasts, and NEXRAD radar.
+Terminal-styled weather dashboard: 3D satellite globe (CesiumJS) with live radar and GOES overlays, animated GOES imagery, NWS forecasts, and NEXRAD radar.
 Runs as a static web app (`app/`), as an iPhone/iPad app (Capacitor wrapper in `ios/`), and as a Windows and macOS
 desktop app (Tauri wrapper in `src-tauri/`). All three load the same `app/` files.
 
@@ -51,7 +51,7 @@ Deploys as-is on Vercel or Netlify (publish directory `app`).
 
 ## Developing
 
-- `npm install` then `npm run vendor` copies Three.js, Leaflet, satellite.js and the font into `app/vendor`
+- `npm install` then `npm run vendor` copies CesiumJS, Leaflet, satellite.js and the font into `app/vendor`
   (committed, so the static site needs no build step).
 - `npx cap sync ios` copies `app/` into the iOS project. On a Mac, `npx cap open ios` opens it in Xcode.
 - Desktop: install Rust (rustup.rs), then `npm run desktop:dev` opens the app in a window and `npm run desktop:build`

@@ -1,10 +1,15 @@
 // Copies third-party libraries into app/vendor so the app runs without CDNs
 // (required for the iOS build, which loads everything from the app bundle).
-import { cpSync, mkdirSync } from 'node:fs';
+import { cpSync, mkdirSync, rmSync } from 'node:fs';
 const nm = 'node_modules/', out = 'app/vendor/';
+rmSync(out + 'three.min.js', { force: true });
 mkdirSync(out + 'fonts', { recursive: true });
 const files = {
-  'three/build/three.min.js': 'three.min.js',
+  'cesium/Build/Cesium/Cesium.js': 'cesium/Cesium.js',
+  'cesium/Build/Cesium/Assets': 'cesium/Assets',
+  'cesium/Build/Cesium/ThirdParty': 'cesium/ThirdParty',
+  'cesium/Build/Cesium/Widgets': 'cesium/Widgets',
+  'cesium/Build/Cesium/Workers': 'cesium/Workers',
   'leaflet/dist/leaflet.js': 'leaflet.js',
   'leaflet/dist/leaflet.css': 'leaflet.css',
   'leaflet/dist/images': 'images',

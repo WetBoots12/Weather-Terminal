@@ -103,7 +103,7 @@ var PAGES={
   '<tr><td><b>NWS GROUND</b></td><td>Your official forecast and any watches, warnings or advisories for your spot</td><td>Your local NWS Weather Forecast Office, through api.weather.gov'+r(29)+'</td></tr>'+
   '<tr><td><b>RADAR</b></td><td>Where precipitation is falling right now, how hard, how it is moving, and whether storms are rotating</td><td>NEXRAD, a network of 160 Doppler radars run by NWS, FAA and the Air Force'+r(30)+'</td></tr>'+
   '<tr><td><b>LIVE IMAGERY</b></td><td>Clouds, moisture, jet streams, storm tops, smoke, fire and lightning over the whole region</td><td>GOES-19 (East) and GOES-18 (West) via NOAA/NESDIS STAR'+r(17)+'</td></tr>'+
-  '<tr><td><b>3D ORBITAL</b></td><td>Which satellites are watching where, day and night, and when the next scan arrives</td><td>NOAA GOES-R and JPSS programs'+r(14,31)+'</td></tr></table>'+
+  '<tr><td><b>3D ORBITAL</b></td><td>A 3D globe that shows which satellites are watching where, day and night, and live radar and GOES imagery draped on the map</td><td>NOAA GOES-R and JPSS programs'+r(14,31)+'</td></tr></table>'+
   '<h3>A TYPICAL WORKFLOW</h3>'+
   '<ol><li><b>NWS GROUND</b> — search your location first. Read any alerts, then the forecast. This also sets the location the Radar tab centers on.</li>'+
   '<li><b>LIVE IMAGERY</b> — look at the big picture: where the clouds, jet stream and storms are, and how they are moving.</li>'+
@@ -119,11 +119,14 @@ var PAGES={
   '<h3>WHAT YOU ARE LOOKING AT</h3>'+
   '<p><b>GOES-19 (East, 75.2°W)</b> and <b>GOES-18 (West, 137.2°W)</b> sit in geostationary orbit 35,786 km up and stare at the same half of the Earth continuously; they supply every image on the Live Imagery tab. The smaller dots are <b>polar orbiters</b>: NOAA-20, NOAA-21 and Suomi NPP (the U.S. JPSS fleet) and Europe\'s MetOp-B/C. JPSS satellites circle pole to pole about 14 times a day, covering the whole globe twice daily, and provide most of the data that feeds U.S. numerical weather prediction.'+r(14)+'</p>'+
   '<h3>HOW TO USE IT</h3>'+
-  '<ul><li><b>Drag</b> to rotate, <b>scroll or pinch</b> to zoom, <b>hover or tap</b> a satellite for its name and position.</li>'+
-  '<li>The shaded <b>terminator</b> marks day and night. Visible bands, GeoColor\'s true-color mode, Sandwich and the Day Cloud Phase half of the Cloud Micro Combo only work on the sunlit side.</li>'+
+  '<ul><li><b>Drag</b> to pan, <b>scroll or pinch</b> to zoom all the way to street level, <b>right-drag or Ctrl-drag</b> (two-finger drag on touch) to tilt toward the horizon, <b>double-click</b> to zoom into a spot. <b>FLY TO</b> takes a place name, address or lat,lon. <b>Hover or tap</b> a satellite for its name and position.</li>'+
+  '<li><b>LIVE RADAR</b>: US NEXRAD composite reflectivity (Iowa Environmental Mesonet, refreshed every 5 minutes) or a global mosaic (RainViewer, coarser). <b>ANIMATE</b> loops the last 50 minutes (US) or last hour (global).</li>'+
+  '<li><b>GOES SATELLITE IMAGERY</b> drapes the newest Full Disk image from GOES-19, GOES-18 or both onto the globe, refreshed every 10 minutes. With both, GOES-19 covers east of 106.2°W and GOES-18 the west. The image is reprojected from the satellite view, so it lines up with the map; detail is about 2 km on desktop and 6 km on phones.</li>'+
+  '<li><b>MAP LAYERS</b> toggle place names and roads, 3D terrain, the lat/lon grid, satellites, and <b>DAY / NIGHT SHADING</b> (darkens the night side from the current sun position). Visible bands, GeoColor\'s true-color mode, Sandwich and the Day Cloud Phase half of the Cloud Micro Combo only work on the sunlit side.</li>'+
   '<li><b>SCAN SCHEDULE</b> counts down to the next Full Disk (10 min), CONUS/PACUS (5 min) and Mesoscale (1 min) scan; this is ABI Scan Mode 6, which GOES flies by default.'+r(31)+' Imagery appears a few minutes after a scan completes, so syncing right at zero may return the previous frame.</li>'+
-  '<li><b>OVERLAY DISK</b>: load a Full Disk on Live Imagery, come back here, and drape the latest image on the globe.</li>'+
-  '<li><b>VIEW ON GLOBE</b> (NWS Ground) drops a red pin at your forecast location.</li></ul>'+
+  '<li><b>OVERLAY LIVE LOOP</b>: load a Full Disk on Live Imagery, come back here, and the whole animated loop plays on the globe.</li>'+
+  '<li><b>VIEW ON GLOBE</b> (NWS Ground) drops a red pin at your forecast location and flies the globe to it.</li>'+
+  '<li>Satellites are drawn closer to Earth than their real altitude so the orbits fit on screen.</li></ul>'+
   '<h3>WHAT TO KEEP IN MIND</h3>'+
   '<p>Geostationary satellites see high latitudes and the disk edge at a steep slant. Features there are stretched, and infrared and water-vapor bands read colder near the edge (limb cooling), up to several degrees.'+r(6,8)+' Lightning and cloud-top features are displaced from their true ground position by parallax, so they will not line up exactly with radar.'+r(13)+'</p>';}},
  loops:{t:'LIVE IMAGERY',h:function(){return ''+
