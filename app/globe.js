@@ -113,7 +113,7 @@ function _gSyncUI(){
   var o=document.getElementById('glOpacity');if(o)o.value=_gOpts.opacity;
   document.querySelectorAll('.gl-mode button').forEach(function(b){b.classList.toggle('on',b.dataset.m===_gOpts.mode);});
   var rs=document.getElementById('glRadarBox'),gb=document.getElementById('glGoesBox');
-  if(rs)rs.style.display=_gOpts.mode==='radar'?'':'none';if(gb)gb.style.display=_gOpts.mode==='goes'?'':'none';
+  if(rs)rs.style.display=_gOpts.mode==='radar'?'':'none';if(gb)gb.style.display=_gOpts.mode==='goes'?'':'none';var gbar=document.getElementById('gl-goes-bar');if(gbar)gbar.style.display=_gOpts.mode==='goes'?'flex':'none';
   _gRadarUI();
 }
 function globeMode(m){if(m===_gOpts.mode)return;_gOpts.mode=m;_gSave();_gSyncUI();if(!_G.v)return;_gRadar();_gGoes();_gRender();}
@@ -427,16 +427,21 @@ function _gRadarUI(){
   if(_gOpts.radar==='bref_qcd'&&_G.radarSrc==='RAINVIEWER')lk='rvub';
   var L=on&&RADAR_LEGENDS[lk];
   if(!L){el.style.display='none';return;}
-  var h='<div class="rl-hd"><span>'+L.t+'</span><span>'+(L.u||'')+'</span></div>',tk=function(c){return'<div class="rl-ticks'+(c||'')+'">'+L.ticks.map(function(t){return'<span style="left:'+Math.min(Math.max(t[0],4),96)+'%">'+t[1]+'</span>';}).join('')+'</div>';};
+  /* compact by default (header + color bar); details (type notes, class lists, legend images) open on click */
+  var open=!!_gOpts.keyOpen,small=!L.img&&!L.cats;
+  var h='<div class="rl-hd" onclick="radarKeyToggle()" title="'+(open?'Hide':'Show')+' key details"><span>'+(open?'▾ ':'▸ ')+L.t+'</span><span>'+(L.u||'')+'</span></div>',tk=function(c){return'<div class="rl-ticks'+(c||'')+'">'+L.ticks.map(function(t){return'<span style="left:'+Math.min(Math.max(t[0],4),96)+'%">'+t[1]+'</span>';}).join('')+'</div>';};
+  if(!open&&!small){el.innerHTML=h;el.className='rl-min';el.style.display='block';return;}
   if(L.img)h+='<img src="'+L.img+'" alt="'+L.t+' legend" onerror="this.outerHTML=\'<div class=rl-note>LEGEND IMAGE UNAVAILABLE OFFLINE</div>\'">';
   else if(L.bars)h+=L.bars.map(function(b){return'<div class="rl-bl"><b>'+b[0]+'</b><div class="rl-bar" style="background:linear-gradient(to right,'+b[1]+')"></div></div>';}).join('')+tk(' rl-pad');
   else if(L.cats)h+='<div class="rl-cats">'+L.cats.map(function(c){return'<span title="'+c[2]+'"><i style="background:'+c[0]+'"></i>'+c[2]+'</span>';}).join('')+'</div>';
   else{h+='<div class="rl-bar" style="background:linear-gradient(to right,'+L.g+')"></div>'+tk();
     if(L.ends)h+='<div class="rl-ends"><span>'+L.ends[0]+'</span><span>'+L.ends[1]+'</span></div>';}
+  if(!open){el.innerHTML=h;el.className='rl-min';el.style.display='block';return;}
   if(L.types)h+='<div class="rl-types">'+L.types.map(function(t){return'<div><i style="background:'+t[0]+'"></i><b>'+t[1]+'</b><span>'+t[2]+'</span></div>';}).join('')+'</div>';
   if(L.note)h+='<div class="rl-note">'+L.note+'</div>';
-  el.innerHTML=h;el.style.display='block';
+  el.innerHTML=h;el.className='';el.style.display='block';
 }
+function radarKeyToggle(){_gOpts.keyOpen=!_gOpts.keyOpen;_gSave();_gRadarUI();}
 /* Radar-tab API, kept so the NWS tab and saved links keep working */
 function setRadarProduct(k){_gOpts.radar=k;_gSave();_gRadar();}
 function radarToggle(){if(!_gRP(_gOpts.radar).loop)return;_gOpts.loop=!_gOpts.loop;_gSave();

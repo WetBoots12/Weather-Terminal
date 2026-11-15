@@ -87,6 +87,9 @@ html .panel{background:var(--card);border:1px solid var(--line);border-radius:va
 html .phd{border-bottom:none;color:var(--fg);font-size:11px;letter-spacing:.06em;margin-bottom:10px}
 html .lbl,html .stat{color:var(--mut)}
 html select,html input[type=text]{background:#1f1f22!important;border:1px solid transparent!important;border-radius:7px;color:var(--fg)!important;font-family:var(--fui);padding:8px 10px}
+html select{background:#1f1f22 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23ffb400'/%3E%3C/svg%3E") no-repeat right 10px center!important;padding-right:28px!important;cursor:pointer;border:1px solid var(--line)!important}
+html select:hover{border-color:var(--acc)!important}
+html #glRadar,html #glGoes{min-width:230px;font-size:11px}html #glGoesSat{min-width:190px;font-size:11px}html #glRadar{font-size:11px;padding-top:6px;padding-bottom:6px}
 html .btn{border-radius:7px;font-family:var(--fui);letter-spacing:.05em}
 html .btn-ghost{text-decoration:none;color:var(--mut);font-family:var(--fui)}
 html .btn-ghost:hover{color:var(--fg)}
