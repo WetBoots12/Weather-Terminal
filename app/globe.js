@@ -125,7 +125,7 @@ function globeOpt(k,val){
   else if(k==='sats')_G.sats.show=!!val;
   else if(k==='light'){_G.v.scene.globe.enableLighting=!!val;_G.v.scene.globe.dynamicAtmosphereLighting=!!val;}
   else if(k==='radar')_gRadar();
-  else if(k==='goes'||k==='goesSat')_gGoes();
+  else if(k==='goes'||k==='goesSat'){_gGoes();_gKeyUI();}
   else if(k==='opacity')_gApplyOpacity();
   _gRender();
 }
@@ -420,28 +420,38 @@ function _gRadarUI(){
   st('gl-nat',_radarScope==='national');st('gl-loc',_radarScope==='local',_radarLat===null&&!_radarStation);st('gl-st',_showStations);
   var info=document.getElementById('radar-info');
   if(info){var s=_stationById(_radarStation);info.innerHTML=(_radarStation?'STATION: '+_radarStation+(s?' — '+_esc(s[1]):'')+'<br>':'')+(_radarLat!==null?'LAT: '+_radarLat.toFixed(2)+'° LON: '+_radarLon.toFixed(2)+'°':'NO LOCATION — SET ONE ON NWS GROUND OR PICK A STATION');}
-  /* legend */
-  var el=document.getElementById('radar-legend');if(!el)return;
+  _gKeyUI();
+}
+/* COLOR KEY panel (lower left). The KEY button by the overlay switch shows or hides it; it follows the active
+   overlay: the radar product's scale in radar mode, the GOES band's scale (legend.js) in GOES mode. */
+function globeKey(){_gOpts.key=_gOpts.key===false;_gSave();_gKeyUI();}
+function _gKeyUI(){
+  var el=document.getElementById('radar-legend'),kb=document.getElementById('gl-key');if(!el)return;
+  var keyOn=_gOpts.key!==false,m=_gOpts.mode;
+  if(kb){kb.classList.toggle('on',keyOn&&m!=='off');kb.disabled=(m==='off');kb.title=keyOn?'Hide the color key':'Show the color key';}
+  if(!keyOn||m==='off'){el.style.display='none';return;}
+  var close='<span class="rl-x" title="Hide the key">✕</span>',h;
+  if(m==='goes'){
+    var gk=window.goesKeyHTML&&goesKeyHTML(_gOpts.goes);
+    if(!gk){el.innerHTML='<div class="rl-hd" onclick="globeKey()"><span>COLOR KEY</span>'+close+'</div><div class="rl-note">NO COLOR SCALE FOR THIS BAND</div>';el.style.display='block';return;}
+    el.innerHTML='<div class="rl-hd" onclick="globeKey()"><span>COLOR KEY // '+gk.t.toUpperCase()+'</span>'+close+'</div><div class="rl-goes">'+gk.h+'</div>';el.style.display='block';return;
+  }
   /* the global mosaics (and the IEM product when it falls back to RainViewer) use the Universal Blue rain/snow scales */
   var lk=(RADAR_PRODUCTS[_gOpts.radar]||G_RADAR[_gOpts.radar]||{}).legend||(_gOpts.radar==='eccc'?'eccc':G_RADAR[_gOpts.radar]?'rvub':'');
   if(_gOpts.radar==='bref_qcd'&&_G.radarSrc==='RAINVIEWER')lk='rvub';
-  var L=on&&RADAR_LEGENDS[lk];
+  var L=RADAR_LEGENDS[lk];
   if(!L){el.style.display='none';return;}
-  /* compact by default (header + color bar); details (type notes, class lists, legend images) open on click */
-  var open=!!_gOpts.keyOpen,small=!L.img&&!L.cats;
-  var h='<div class="rl-hd" onclick="radarKeyToggle()" title="'+(open?'Hide':'Show')+' key details"><span>'+(open?'▾ ':'▸ ')+L.t+'</span><span>'+(L.u||'')+'</span></div>',tk=function(c){return'<div class="rl-ticks'+(c||'')+'">'+L.ticks.map(function(t){return'<span style="left:'+Math.min(Math.max(t[0],4),96)+'%">'+t[1]+'</span>';}).join('')+'</div>';};
-  if(!open&&!small){el.innerHTML=h;el.className='rl-min';el.style.display='block';return;}
+  h='<div class="rl-hd" onclick="globeKey()"><span>COLOR KEY // '+L.t+(L.u?' ('+L.u+')':'')+'</span>'+close+'</div>';
+  var tk=function(c){return'<div class="rl-ticks'+(c||'')+'">'+L.ticks.map(function(t){return'<span style="left:'+Math.min(Math.max(t[0],4),96)+'%">'+t[1]+'</span>';}).join('')+'</div>';};
   if(L.img)h+='<img src="'+L.img+'" alt="'+L.t+' legend" onerror="this.outerHTML=\'<div class=rl-note>LEGEND IMAGE UNAVAILABLE OFFLINE</div>\'">';
   else if(L.bars)h+=L.bars.map(function(b){return'<div class="rl-bl"><b>'+b[0]+'</b><div class="rl-bar" style="background:linear-gradient(to right,'+b[1]+')"></div></div>';}).join('')+tk(' rl-pad');
   else if(L.cats)h+='<div class="rl-cats">'+L.cats.map(function(c){return'<span title="'+c[2]+'"><i style="background:'+c[0]+'"></i>'+c[2]+'</span>';}).join('')+'</div>';
   else{h+='<div class="rl-bar" style="background:linear-gradient(to right,'+L.g+')"></div>'+tk();
     if(L.ends)h+='<div class="rl-ends"><span>'+L.ends[0]+'</span><span>'+L.ends[1]+'</span></div>';}
-  if(!open){el.innerHTML=h;el.className='rl-min';el.style.display='block';return;}
   if(L.types)h+='<div class="rl-types">'+L.types.map(function(t){return'<div><i style="background:'+t[0]+'"></i><b>'+t[1]+'</b><span>'+t[2]+'</span></div>';}).join('')+'</div>';
   if(L.note)h+='<div class="rl-note">'+L.note+'</div>';
-  el.innerHTML=h;el.className='';el.style.display='block';
+  el.innerHTML=h;el.style.display='block';
 }
-function radarKeyToggle(){_gOpts.keyOpen=!_gOpts.keyOpen;_gSave();_gRadarUI();}
 /* Radar-tab API, kept so the NWS tab and saved links keep working */
 function setRadarProduct(k){_gOpts.radar=k;_gSave();_gRadar();}
 function radarToggle(){if(!_gRP(_gOpts.radar).loop)return;_gOpts.loop=!_gOpts.loop;_gSave();

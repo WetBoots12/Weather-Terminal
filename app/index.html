@@ -270,7 +270,7 @@ option,optgroup{background:#111;color:var(--y)}
 @media(max-width:480px){#radar-ctrl button{padding:4px 7px!important;font-size:8px!important}}
 #radar-prod{background:#000 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23ffb400'/%3E%3C/svg%3E") no-repeat right 7px center;border:1px solid #ffb400;color:#ffb400;font-size:9px;letter-spacing:.05em;padding:4px 22px 4px 8px;min-height:30px;width:auto;max-width:calc(100vw - 40px);cursor:pointer}
 @media(pointer:coarse),(max-width:768px){#radar-prod{font-size:16px!important;letter-spacing:0;padding:2px 22px 2px 8px;min-height:30px}}
-#radar-legend{display:none;position:absolute;left:12px;bottom:42px;z-index:14;max-height:calc(100% - 140px);overflow:auto;background:rgba(0,0,0,.82);border:1px solid rgba(255,180,0,.35);padding:5px 8px 4px;width:250px;max-width:calc(100vw - 24px);box-sizing:border-box;color:rgba(255,180,0,.85);font-size:8px;letter-spacing:.04em}
+#radar-legend{display:none;position:absolute;left:12px;bottom:42px;z-index:14;max-height:calc(100% - 140px);overflow:auto;background:rgba(0,0,0,.82);border:1px solid rgba(255,180,0,.35);padding:5px 8px 4px;width:290px;max-width:calc(100vw - 24px);box-sizing:border-box;color:rgba(255,180,0,.85);font-size:8px;letter-spacing:.04em}
 #radar-legend .rl-hd{cursor:pointer;display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;color:#ffb400}
 #radar-legend .rl-bar{height:9px;border:1px solid rgba(255,255,255,.15)}
 #radar-legend .rl-ticks{position:relative;height:11px;margin-top:1px}
@@ -278,7 +278,7 @@ option,optgroup{background:#111;color:var(--y)}
 #radar-legend .rl-ends{display:flex;justify-content:space-between;opacity:.65;margin-top:1px}
 #radar-legend .rl-cats{display:grid;grid-template-columns:repeat(3,1fr);gap:2px 8px}
 #radar-legend .rl-cats i{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;border:1px solid rgba(255,255,255,.2)}
-#radar-legend .rl-bl{display:flex;align-items:center;gap:6px;margin-bottom:2px}#radar-legend .rl-bl b{width:30px;font-weight:normal}#radar-legend .rl-bl .rl-bar{flex:1}#radar-legend .rl-pad{margin-left:36px}#radar-legend .rl-types{margin-top:3px}#radar-legend .rl-types div{display:flex;gap:5px}#radar-legend .rl-types i{flex:none;width:9px;height:9px;border:1px solid rgba(255,255,255,.2)}#radar-legend .rl-types b{font-weight:normal;color:#ffb400;flex:none}#radar-legend img{display:block;max-width:100%;max-height:160px;background:#fff;margin:2px 0}#radar-legend.rl-min .rl-hd{margin-bottom:0}#radar-legend.rl-min .rl-bar,#radar-legend.rl-min .rl-bl{margin-top:3px}@media(max-width:700px){#radar-legend{bottom:auto;top:96px;width:200px}}
+#radar-legend .rl-bl{display:flex;align-items:center;gap:6px;margin-bottom:2px}#radar-legend .rl-bl b{width:30px;font-weight:normal}#radar-legend .rl-bl .rl-bar{flex:1}#radar-legend .rl-pad{margin-left:36px}#radar-legend .rl-types{margin-top:3px}#radar-legend .rl-types div{display:flex;gap:5px}#radar-legend .rl-types i{flex:none;width:9px;height:9px;border:1px solid rgba(255,255,255,.2)}#radar-legend .rl-types b{font-weight:normal;color:#ffb400;flex:none}#radar-legend img{display:block;max-width:100%;max-height:160px;background:#fff;margin:2px 0}#radar-legend .rl-x{opacity:.6;padding-left:6px}#radar-legend .rl-hd:hover .rl-x{opacity:1}#radar-legend .rl-goes{font-size:9px}#radar-legend .rl-goes .lg-bar{height:10px}.gl-mode .gl-keybtn{border-left:1px solid rgba(255,180,0,.35)}@media(max-width:700px){#radar-legend{bottom:auto;top:96px;width:200px}}
 #radar-legend .rl-note{opacity:.55;margin-top:2px}
 /* NEXRAD station marker tooltip */
 </style>
@@ -477,7 +477,7 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
     <div class="scanline"></div>
     <div id="view-3d" class="view">
       <div id="globe-wrap"><div id="globe-cesium"></div>
-        <div class="gl-mode gl-float" title="Switch the weather overlay"><button data-m="radar" onclick="globeMode('radar')">RADAR</button><button data-m="goes" onclick="globeMode('goes')">GOES</button><button data-m="off" onclick="globeMode('off')">OFF</button></div>
+        <div class="gl-mode gl-float" title="Switch the weather overlay"><button data-m="radar" onclick="globeMode('radar')">RADAR</button><button data-m="goes" onclick="globeMode('goes')">GOES</button><button data-m="off" onclick="globeMode('off')">OFF</button><button id="gl-key" class="gl-keybtn" onclick="globeKey()" aria-label="Show or hide the color key">▤ KEY</button></div>
         <div id="gl-ts"></div>
         <div id="gl-bottom">
         <div id="gl-dsl" class="tsl" title="GOES live loop time"><button onclick="toggleImgPause()" aria-label="Play or pause the GOES loop">▶</button><b>GOES</b><input type="range" min="0" max="0" value="0" aria-label="GOES frame time" oninput="imgScrub(this.value)"><span class="tsl-t"></span></div>
