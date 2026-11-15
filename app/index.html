@@ -121,7 +121,9 @@ option,optgroup{background:#111;color:var(--y)}
 #img-tsl{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:10}
 #gl-radar-bar{display:none;flex-direction:column;gap:5px;align-items:center;max-width:calc(100% - 16px)}
 .gl-rrow{display:flex;flex-wrap:wrap;justify-content:center;gap:2px;background:rgba(0,0,0,.9);border:1px solid rgba(255,180,0,.35);padding:3px}
-.gl-rrow select{width:auto;margin:0;padding:4px 6px;font-size:9px}
+.gl-rrow select{width:auto;margin:0;padding:4px 6px;font-size:9px;cursor:pointer}
+#gl-goes-bar{display:none;align-items:center}
+.gl-plbl{align-self:center;font-size:8px;letter-spacing:.08em;opacity:.6;padding:0 2px 0 6px}
 .gl-rrow button{background:rgba(255,180,0,.05);border:1px solid rgba(255,180,0,.25);color:rgba(255,180,0,.6);font-family:inherit;font-size:9px;letter-spacing:.06em;padding:4px 10px;cursor:pointer}
 .gl-rrow button.on{background:rgba(255,180,0,.28);color:#ffb400;border-color:#ffb400}
 .gl-rrow button:disabled{opacity:.35;pointer-events:none}
@@ -268,15 +270,16 @@ option,optgroup{background:#111;color:var(--y)}
 @media(max-width:480px){#radar-ctrl button{padding:4px 7px!important;font-size:8px!important}}
 #radar-prod{background:#000 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23ffb400'/%3E%3C/svg%3E") no-repeat right 7px center;border:1px solid #ffb400;color:#ffb400;font-size:9px;letter-spacing:.05em;padding:4px 22px 4px 8px;min-height:30px;width:auto;max-width:calc(100vw - 40px);cursor:pointer}
 @media(pointer:coarse),(max-width:768px){#radar-prod{font-size:16px!important;letter-spacing:0;padding:2px 22px 2px 8px;min-height:30px}}
-#radar-legend{display:none;background:rgba(0,0,0,.88);border:1px solid rgba(255,180,0,.35);padding:5px 8px 4px;width:320px;max-width:calc(100vw - 16px);box-sizing:border-box;color:rgba(255,180,0,.85);font-size:8px;letter-spacing:.04em}
-#radar-legend .rl-hd{display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;color:#ffb400}
+#radar-legend{display:none;position:absolute;left:12px;bottom:42px;z-index:14;max-height:calc(100% - 140px);overflow:auto;background:rgba(0,0,0,.82);border:1px solid rgba(255,180,0,.35);padding:5px 8px 4px;width:250px;max-width:calc(100vw - 24px);box-sizing:border-box;color:rgba(255,180,0,.85);font-size:8px;letter-spacing:.04em}
+#radar-legend .rl-hd{cursor:pointer;display:flex;justify-content:space-between;gap:8px;margin-bottom:3px;color:#ffb400}
 #radar-legend .rl-bar{height:9px;border:1px solid rgba(255,255,255,.15)}
 #radar-legend .rl-ticks{position:relative;height:11px;margin-top:1px}
 #radar-legend .rl-ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
 #radar-legend .rl-ends{display:flex;justify-content:space-between;opacity:.65;margin-top:1px}
 #radar-legend .rl-cats{display:grid;grid-template-columns:repeat(3,1fr);gap:2px 8px}
 #radar-legend .rl-cats i{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;border:1px solid rgba(255,255,255,.2)}
-#radar-legend .rl-bl{display:flex;align-items:center;gap:6px;margin-bottom:2px}#radar-legend .rl-bl b{width:30px;font-weight:normal}#radar-legend .rl-bl .rl-bar{flex:1}#radar-legend .rl-pad{margin-left:36px}#radar-legend .rl-types{margin-top:3px}#radar-legend .rl-types div{display:flex;gap:5px}#radar-legend .rl-types i{flex:none;width:9px;height:9px;border:1px solid rgba(255,255,255,.2)}#radar-legend .rl-types b{font-weight:normal;color:#ffb400;flex:none}#radar-legend img{display:block;max-width:100%;max-height:160px;background:#fff;margin:2px 0}#radar-legend .rl-note{opacity:.55;margin-top:2px}
+#radar-legend .rl-bl{display:flex;align-items:center;gap:6px;margin-bottom:2px}#radar-legend .rl-bl b{width:30px;font-weight:normal}#radar-legend .rl-bl .rl-bar{flex:1}#radar-legend .rl-pad{margin-left:36px}#radar-legend .rl-types{margin-top:3px}#radar-legend .rl-types div{display:flex;gap:5px}#radar-legend .rl-types i{flex:none;width:9px;height:9px;border:1px solid rgba(255,255,255,.2)}#radar-legend .rl-types b{font-weight:normal;color:#ffb400;flex:none}#radar-legend img{display:block;max-width:100%;max-height:160px;background:#fff;margin:2px 0}#radar-legend.rl-min .rl-hd{margin-bottom:0}#radar-legend.rl-min .rl-bar,#radar-legend.rl-min .rl-bl{margin-top:3px}@media(max-width:700px){#radar-legend{bottom:auto;top:96px;width:200px}}
+#radar-legend .rl-note{opacity:.55;margin-top:2px}
 /* NEXRAD station marker tooltip */
 </style>
 <script>
@@ -321,16 +324,13 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
       <div id="glStatus" class="stat" style="font-size:9px;margin-top:-4px;margin-bottom:4px"></div>
       <button class="btn-ghost" style="margin-top:0" onclick="globeHome()">⌂ RESET VIEW</button>
       <div class="phd" style="margin-top:10px">WEATHER LAYERS</div>
-      <div class="stat" style="font-size:9px;margin-bottom:6px">OVERLAY SWITCH, RADAR PRODUCT AND RADAR CONTROLS ARE ON THE GLOBE (TOP RIGHT / BOTTOM)</div>
+      <div class="stat" style="font-size:9px;margin-bottom:6px">OVERLAY SWITCH IS ON THE GLOBE (TOP RIGHT); RADAR AND GOES CONTROLS SIT AT THE BOTTOM OF THE GLOBE</div>
       <div id="glRadarBox">
       <span class="lbl">RADAR LOCATION</span>
       <div class="stat" id="radar-info" style="font-size:9px">NO LOCATION — SET ONE ON NWS GROUND OR PICK A STATION</div>
       <div id="glRadarInfo" class="stat" style="font-size:9px;margin-bottom:6px"></div>
       </div>
       <div id="glGoesBox">
-      <span class="lbl">GOES BAND</span>
-      <select id="glGoes" onchange="globeOpt('goes',this.value)"><option value="GEOCOLOR">GEOCOLOR</option><option value="13">IR — CH13 CLEAN LONGWAVE</option><option value="02">VISIBLE — CH02 RED</option><option value="09">WATER VAPOR — CH09 MID-LEVEL</option><option value="AirMass">AIRMASS RGB</option><option value="Sandwich">SANDWICH RGB</option><option value="DayNightCloudMicroCombo">DAY/NIGHT CLOUD MICRO</option></select>
-      <select id="glGoesSat" onchange="globeOpt('goesSat',this.value)"><option value="both">GOES-19 EAST + GOES-18 WEST</option><option value="GOES19">GOES-19 EAST</option><option value="GOES18">GOES-18 WEST</option></select>
       <div id="glGoesInfo" class="stat" style="font-size:9px;margin-bottom:6px"></div>
       </div>
       <span class="lbl">OVERLAY OPACITY</span>
@@ -481,9 +481,10 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
         <div id="gl-ts"></div>
         <div id="gl-bottom">
         <div id="gl-dsl" class="tsl" title="GOES live loop time"><button onclick="toggleImgPause()" aria-label="Play or pause the GOES loop">▶</button><b>GOES</b><input type="range" min="0" max="0" value="0" aria-label="GOES frame time" oninput="imgScrub(this.value)"><span class="tsl-t"></span></div>
+        <div id="gl-goes-bar" class="gl-rrow"><label for="glGoes" class="gl-plbl">BAND</label><select id="glGoes" onchange="globeOpt('goes',this.value)"><option value="GEOCOLOR">GEOCOLOR</option><option value="13">IR — CH13 CLEAN LONGWAVE</option><option value="02">VISIBLE — CH02 RED</option><option value="09">WATER VAPOR — CH09 MID-LEVEL</option><option value="AirMass">AIRMASS RGB</option><option value="Sandwich">SANDWICH RGB</option><option value="DayNightCloudMicroCombo">DAY/NIGHT CLOUD MICRO</option></select><label for="glGoesSat" class="gl-plbl">SATELLITE</label><select id="glGoesSat" onchange="globeOpt('goesSat',this.value)"><option value="both">GOES-19 EAST + GOES-18 WEST</option><option value="GOES19">GOES-19 EAST</option><option value="GOES18">GOES-18 WEST</option></select></div>
         <div id="gl-radar-bar">
           <div class="gl-rrow">
-            <select id="glRadar" aria-label="Radar product" onchange="setRadarProduct(this.value)">
+            <label for="glRadar" class="gl-plbl">PRODUCT</label><select id="glRadar" aria-label="Radar product" onchange="setRadarProduct(this.value)">
               <optgroup label="LIVE RADAR MOSAICS"><option value="libre">GLOBAL — OPEN GOV MOSAIC</option><option value="global">GLOBAL — RAINVIEWER</option><option value="bref_qcd">US — NEXRAD BASE REFL</option><option value="eccc">N. AMERICA — ENV. CANADA 1 KM</option></optgroup>
               <optgroup label="US REFLECTIVITY"><option value="cref_qcd">COMPOSITE REFL (MRMS)</option><option value="ptype">PRECIP TYPE — RAIN / SNOW / HAIL (MRMS)</option><option value="eet">ECHO TOPS</option><option value="hrrr">FUTURE RADAR (HRRR)</option></optgroup>
               <optgroup label="VELOCITY (PICK A STATION)"><option value="vel_qcd">BASE VELOCITY</option><option value="srv">STORM-REL VELOCITY</option></optgroup>
@@ -495,9 +496,9 @@ if('serviceWorker' in navigator&&!IS_NATIVE&&location.protocol==='https:'){
             <button id="gl-st" onclick="toggleRadarStations()">◇ STATIONS</button>
           </div>
           <div id="gl-rsl" class="tsl" title="Radar frame time"><button onclick="radarToggle()" aria-label="Play or pause the radar loop">▶</button><b>RADAR</b><input type="range" min="0" max="0" value="0" aria-label="Radar frame time" oninput="radarScrub(this.value)"><span class="tsl-t"></span></div>
-          <div id="radar-legend" aria-live="polite"></div>
         </div>
         </div>
+        <div id="radar-legend" aria-live="polite"></div>
         <div id="sat-tip"></div>
       </div>
     </div>
