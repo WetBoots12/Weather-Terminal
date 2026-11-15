@@ -1,8 +1,8 @@
 /* NWS GROUND — layout: hero (location + current), hour scrubber (slider + wind dial + readouts),
    one tabbed graph with an hour cursor, 7-day list. Depends on helpers in index.html
    (f2c, mph2kph, fmtHour, fmtDay, sparkSVG, degToCardinal, _esc, _nwsUnits). */
-var _nx=null,_nxHr=0,_nxGraph='temp',_nxSec='hourly',_nxRO=null;
-try{_nxGraph=localStorage.getItem('gs_nx_graph')||'temp';_nxSec=localStorage.getItem('gs_nx_sec')||'hourly';}catch(e){}
+var _nx=null,_nxHr=0,_nxGraph='temp',_nxRO=null;
+try{_nxGraph=localStorage.getItem('gs_nx_graph')||'temp';}catch(e){}
 var _CARD={N:0,NNE:22.5,NE:45,ENE:67.5,E:90,ESE:112.5,SE:135,SSE:157.5,S:180,SSW:202.5,SW:225,WSW:247.5,W:270,WNW:292.5,NW:315,NNW:337.5};
 
 /* value of an NWS grid series at time t (validTime = start/duration) */
@@ -64,31 +64,50 @@ function _nxHourPanel(){
     '<input type="range" id="nx-sl" class="nx-sl" min="0" max="'+(n-1)+'" value="'+_nxHr+'" oninput="nwsSetHour(+this.value)" aria-label="Forecast hour">'+
     '<div class="nx-sl-ticks" id="nx-ticks"></div></div>';
 }
-function _nxStrip(){
-  var tu=_nwsUnits==='imperial'?'°':'°';
-  return'<div class="nx-strip" id="nx-strip">'+_nx.hours.map(function(h,i){return'<button class="nx-sh" data-i="'+i+'" onclick="nwsSetHour('+i+',1)"><span class="nx-sh-t">'+fmtHour(h.t)+'</span><span class="nx-sh-v">'+Math.round(h.temp)+tu+'</span><span class="nx-sh-p">'+(h.pop>=10?h.pop+'%':'&nbsp;')+'</span></button>';}).join('')+'</div>';
-}
 function _nxGraphBox(){
   return'<div class="nx-graph nx-card"><div class="nx-gtabs" role="tablist">'+_nx.series.map(function(s){return'<button role="tab" data-k="'+s.k+'" onclick="nwsGraphTab(\''+s.k+'\')">'+s.lbl+'</button>';}).join('')+'<span class="nx-gunit" id="nx-gunit"></span></div><div class="nx-gwrap"><div id="nx-gsvg"></div><div class="nx-cur" id="nx-cur"><span id="nx-curv"></span></div></div></div>';
 }
-function _nxDays(cards){
+/* 7-day: day/night periods paired into cards; the selected card's NWS text forecast shows below */
+var _nxDay=0;
+function _nxDayList(){
   var P=_nx.periods,imp=_nwsUnits==='imperial',out=[],i=0;
   function T(p){return Math.round(imp?p.temperature:f2c(p.temperature));}
-  while(i<P.length){var p=P[i],hi=null,lo=null,day=p,night=null;if(p.isDaytime){hi=T(p);if(P[i+1]&&!P[i+1].isDaytime){night=P[i+1];lo=T(night);i+=2;}else i++;}else{lo=T(p);night=p;day=null;i++;}
-    var name=(day||night).name.replace(/ NIGHT$/i,'').replace(/^THIS /i,'').toUpperCase(),lead=day||night,pop=lead.probabilityOfPrecipitation&&lead.probabilityOfPrecipitation.value;
-    out.push({name:name==='AFTERNOON'?'TODAY':name==='TONIGHT'?'TONIGHT':name.slice(0,3),full:name,hi:hi,lo:lo,short:lead.shortForecast||'',pop:pop,det:(day?day.name+': '+day.detailedForecast:'')+(night?(day?'\n\n':'')+night.name+': '+night.detailedForecast:'')});}
-  if(cards)return'<div class="nx-dcards">'+out.map(function(d){return'<div class="nx-dc nx-card" onclick="this.classList.toggle(\'open\')" title="'+_esc(d.det)+'"><div class="nx-k">'+d.name+'</div><div class="nx-dc-t"><b>'+(d.hi!=null?d.hi+'°':'—')+'</b><span>'+(d.lo!=null?d.lo+'°':'')+'</span></div><div class="nx-dc-s">'+_esc(d.short)+'</div>'+(d.pop?'<div class="nx-pop">'+d.pop+'%</div>':'')+'</div>';}).join('')+'</div>';
-  return'<div class="nx-days">'+out.map(function(d){return'<div class="nx-dr" onclick="this.classList.toggle(\'open\')"><span class="nx-dr-n">'+d.name+'</span><span class="nx-dr-s">'+_esc(d.short)+'</span><span class="nx-dr-p">'+(d.pop?d.pop+'%':'')+'</span><span class="nx-dr-t"><b>'+(d.hi!=null?d.hi+'°':'—')+'</b> <i>'+(d.lo!=null?d.lo+'°':'')+'</i></span><div class="nx-dr-d">'+_esc(d.det)+'</div></div>';}).join('')+'</div>';
+  while(i<P.length){var p=P[i],day=null,night=null;if(p.isDaytime){day=p;if(P[i+1]&&!P[i+1].isDaytime){night=P[i+1];i+=2;}else i++;}else{night=p;i++;}
+    var lead=day||night,nm=lead.name.toUpperCase().replace(/ NIGHT$/,''),pop=lead.probabilityOfPrecipitation&&lead.probabilityOfPrecipitation.value;
+    out.push({name:/^(THIS|TODAY|TONIGHT|OVERNIGHT)/.test(nm)?'TODAY':nm.slice(0,3),full:nm,hi:day?T(day):null,lo:night?T(night):null,short:lead.shortForecast||'',pop:pop,day:day,night:night});}
+  return out;
+}
+function _nxDays(){
+  _nx.days=_nxDayList();if(_nxDay>=_nx.days.length)_nxDay=0;
+  return'<div class="nx-dcards">'+_nx.days.map(function(d,i){return'<button class="nx-dc nx-card" data-d="'+i+'" onclick="nwsDay('+i+')"><div class="nx-k">'+d.name+'</div><div class="nx-dc-t"><b>'+(d.hi!=null?d.hi+'°':'—')+'</b><span>'+(d.lo!=null?d.lo+'°':'')+'</span></div><div class="nx-dc-s">'+_esc(d.short)+'</div>'+(d.pop?'<div class="nx-pop">'+d.pop+'% PRECIP</div>':'')+'</button>';}).join('')+'</div>'+
+    '<div class="nx-text nx-card" id="nx-text"></div>';
+}
+function nwsDay(i){
+  if(!_nx||!_nx.days)return;_nxDay=i;var d=_nx.days[i];if(!d)return;
+  document.querySelectorAll('.nx-dc').forEach(function(b){b.classList.toggle('on',+b.getAttribute('data-d')===i);});
+  var t=document.getElementById('nx-text');if(!t)return;
+  t.innerHTML='<div class="nx-text-hd"><span class="nx-k">NWS TEXT FORECAST</span><span class="nx-k">'+_esc(_nx.office||'')+'</span></div>'+[d.day,d.night].filter(Boolean).map(function(p){return'<p><b>'+_esc(p.name)+'</b> '+_esc(p.detailedForecast||p.shortForecast||'')+'</p>';}).join('');
 }
 function _nxHero(){
   var D=_nx,c=D.periods[0],h=D.hours[0]||{},imp=_nwsUnits==='imperial',tu=imp?'°F':'°C',wu=imp?'MPH':'KM/H',temp=h.temp!=null?Math.round(h.temp):Math.round(imp?c.temperature:f2c(c.temperature));
   var meta=[h.feels!=null?'FEELS '+Math.round(h.feels)+'°':null,h.wind!=null?'WIND '+h.dir+' '+h.wind+' '+wu:null,h.rh!=null?'HUMIDITY '+h.rh+'%':null,'PRECIP '+(h.pop||0)+'%'].filter(Boolean);
   return'<div class="nx-hero"><div class="nx-loc"><div class="nx-place">'+_esc(D.place)+'</div><div class="nx-sub">'+_esc(D.sub)+'</div></div>'+
-    '<div class="nx-now" onclick="this.classList.toggle(\'open\')"><div class="nx-temp">'+temp+'<small>'+tu+'</small></div><div class="nx-now-txt"><div class="nx-cond">'+_esc(h.short||c.shortForecast)+'</div><div class="nx-meta">'+meta.map(function(m){return'<span>'+m+'</span>';}).join('')+'<span class="nx-more">FORECAST ▾</span></div>'+
-    '<div class="nx-today"><span class="nx-k">'+_esc(c.name)+'</span> '+_esc(c.detailedForecast||c.shortForecast)+'</div></div></div></div>';
+    '<div class="nx-now"><div class="nx-temp">'+temp+'<small>'+tu+'</small></div><div class="nx-now-txt"><div class="nx-cond">'+_esc(h.short||c.shortForecast)+'</div><div class="nx-meta">'+meta.map(function(m){return'<span>'+m+'</span>';}).join('')+'</div></div></div>'+
+    '<div class="nx-today"><span class="nx-k">'+_esc(c.name)+'</span> '+_esc(c.detailedForecast||c.shortForecast)+'</div></div>';
 }
+/* alerts + special weather statements: always present so "nothing active" is visible too */
+var _SEV={Extreme:1,Severe:2,Moderate:3,Minor:4,Unknown:5};
+/* NWS products hard-wrap lines at ~69 chars: rejoin lines, keep blank-line paragraph breaks */
+function _nxParas(t){return String(t||'').split(/\n\s*\n/).map(function(x){x=x.replace(/\s*\n\s*/g,' ').trim();return x?'<p>'+_esc(x)+'</p>':'';}).join('');}
 function _nxAlerts(){
-  return(_nx.alerts||[]).map(function(a){var p=a.properties;return'<div class="nx-alert" onclick="this.classList.toggle(\'open\')"><div class="nx-alert-h">⚠ '+_esc(p.headline||p.event)+'<span>DETAILS ▾</span></div><div class="nx-alert-b">'+_esc(p.description||'')+'<br><br>EXPIRES '+_esc(p.ends||p.expires?new Date(p.ends||p.expires).toUTCString().slice(0,22)+' UTC':'—')+'</div></div>';}).join('');
+  var A=(_nx.alerts||[]).slice().sort(function(a,b){return(_SEV[a.properties.severity]||5)-(_SEV[b.properties.severity]||5);}),off=_nx.office;
+  var hwo=off?'<a href="https://forecast.weather.gov/product.php?site='+off+'&issuedby='+off+'&product=HWO" target="_blank">HAZARDOUS WEATHER OUTLOOK ↗</a>':'';
+  function tm(s){return s?fmtDay(new Date(s).getTime())+' '+fmtHour(new Date(s).getTime()):'—';}
+  var rows=A.map(function(a){var p=a.properties,sev=(p.severity||'Unknown').toLowerCase();
+    return'<div class="nx-al sev-'+sev+'" onclick="this.classList.toggle(\'open\')"><div class="nx-al-h"><b>'+_esc(p.event||'ALERT')+'</b><span class="nx-al-t">'+tm(p.onset||p.effective)+' → '+tm(p.ends||p.expires)+'</span><span class="nx-al-x">▾</span></div>'+
+      '<div class="nx-al-hl">'+_esc(p.headline||'')+'</div><div class="nx-al-b">'+_nxParas(p.description)+_nxParas(p.instruction)+'<div class="nx-al-src">'+_esc(p.senderName||'')+'</div></div></div>';}).join('');
+  return'<div class="nx-alerts nx-card'+(A.length?' has':'')+'"><div class="nx-alerts-hd"><span class="nx-k">ALERTS &amp; SPECIAL WEATHER STATEMENTS'+(A.length?' <i>'+A.length+'</i>':'')+'</span>'+hwo+'</div>'+
+    (rows||'<div class="nx-al-none"><span class="nx-ok"></span>NO ACTIVE ALERTS OR STATEMENTS FOR THIS LOCATION</div>')+'</div>';
 }
 function _nxLinks(){var D=_nx;return'<div class="nx-links">NWS: <a href="https://forecast.weather.gov/MapClick.php?lat='+D.lat+'&lon='+D.lon+'&FcstType=graphical" target="_blank">GRAPHICAL ↗</a> <a href="https://forecast.weather.gov/MapClick.php?lat='+D.lat+'&lon='+D.lon+'" target="_blank">FORECAST ↗</a> <a href="https://radar.weather.gov/" target="_blank">RADAR ↗</a> <a href="https://www.nhc.noaa.gov" target="_blank">NHC ↗</a></div>';}
 
@@ -96,18 +115,13 @@ function renderNWS(){
   if(!_nx)return;var el=document.getElementById('nws-content');if(!el)return;
   _nx.hours=_nxHours();_nx.series=_nxSeries();if(_nxHr>=_nx.hours.length)_nxHr=0;
   if(!_nx.series.some(function(s){return s.k===_nxGraph;}))_nxGraph='temp';
-  var ui=document.documentElement.getAttribute('data-ui')||'a',o=_nxAlerts()+_nxHero();
-  if(ui==='b')o+='<div class="nx-cols">'+_nxHourPanel()+_nxGraphBox()+'</div><div class="nx-shd">7-DAY</div>'+_nxDays(true);
-  else if(ui==='c')o+=_nxHourPanel()+'<div class="nx-seg" role="tablist"><button data-s="hourly" onclick="nwsSection(\'hourly\')">HOURLY</button><button data-s="graphs" onclick="nwsSection(\'graphs\')">GRAPHS</button><button data-s="days" onclick="nwsSection(\'days\')">7-DAY</button></div>'+
-    '<div class="nx-sec" data-s="hourly">'+_nxStrip()+'</div><div class="nx-sec" data-s="graphs">'+_nxGraphBox()+'</div><div class="nx-sec" data-s="days">'+_nxDays(false)+'</div>';
-  else o+='<div class="nx-shd">48-HOUR</div>'+_nxStrip()+_nxHourPanel()+'<div class="nx-shd">TRENDS</div>'+_nxGraphBox()+'<div class="nx-shd">7-DAY</div>'+_nxDays(false);
-  el.innerHTML=o+_nxLinks();
-  if(ui==='c')nwsSection(_nxSec);
-  _nxTicks();nwsGraphTab(_nxGraph,true);nwsSetHour(_nxHr);
+  el.innerHTML=_nxHero()+_nxAlerts()+'<div class="nx-cols">'+_nxHourPanel()+_nxGraphBox()+'</div><div class="nx-shd">7-DAY</div>'+_nxDays()+_nxLinks();
+  _nxTicks();nwsGraphTab(_nxGraph,true);nwsSetHour(_nxHr);nwsDay(_nxDay);
+  var tb=document.querySelector('.tab-btn[onclick*="\'nws\'"]'),n=(_nx.alerts||[]).length;if(tb)tb.setAttribute('data-alerts',n?n:'');
   if(!_nxRO&&window.ResizeObserver){_nxRO=new ResizeObserver(function(){var g=document.getElementById('nx-gsvg');if(g&&g.clientWidth&&g._w!==g.clientWidth)nwsGraphTab(_nxGraph,true);});_nxRO.observe(el);}
 }
 function _nxTicks(){var t=document.getElementById('nx-ticks');if(!t)return;var H=_nx.hours,n=H.length,s='';for(var i=0;i<n;i++){var o=_tzParts(H[i].t),hr=o?o.hour+o.dayPeriod:'';if(hr==='12AM'||i===0)s+='<span style="left:'+(i/(n-1)*100).toFixed(2)+'%">'+(i===0?'NOW':fmtDay(H[i].t))+'</span>';}t.innerHTML=s;}
-function nwsSetHour(i,fromStrip){
+function nwsSetHour(i){
   if(!_nx||!_nx.hours.length)return;_nxHr=Math.max(0,Math.min(_nx.hours.length-1,i));var h=_nx.hours[_nxHr],imp=_nwsUnits==='imperial',tu=imp?'°F':'°C',wu=imp?'MPH':'KM/H';
   var sl=document.getElementById('nx-sl');if(sl&&+sl.value!==_nxHr)sl.value=_nxHr;
   if(sl)sl.style.setProperty('--p',(_nxHr/(_nx.hours.length-1)*100)+'%');
@@ -116,7 +130,6 @@ function nwsSetHour(i,fromStrip){
   var dr=document.getElementById('nx-dir');if(dr)dr.textContent=h.deg==null?'—':'FROM '+h.dir+' · '+Math.round(h.deg)+'°'+(h.gust&&h.gust>h.wind?' · GUST '+h.gust:'');
   var R=[['TEMP',Math.round(h.temp)+tu,1],['FEELS',h.feels!=null?Math.round(h.feels)+tu:'—'],['PRECIP',h.pop+'%'],['HUMIDITY',h.rh!=null?h.rh+'%':'—'],['DEW PT',h.dew!=null?Math.round(h.dew)+tu:'—'],['SKY',h.sky!=null?h.sky+'%':'—']];
   var rd=document.getElementById('nx-read');if(rd)rd.innerHTML='<div class="nx-cond2">'+_esc(h.short)+'</div>'+R.map(function(r){return'<div class="nx-ri'+(r[2]?' big':'')+'"><span class="nx-k">'+r[0]+'</span><b>'+r[1]+'</b></div>';}).join('');
-  var st=document.getElementById('nx-strip');if(st){st.querySelectorAll('.nx-sh.on').forEach(function(b){b.classList.remove('on');});var b=st.querySelector('[data-i="'+_nxHr+'"]');if(b){b.classList.add('on');if(!fromStrip){var l=b.offsetLeft-st.clientWidth/2+b.clientWidth/2;st.scrollLeft=l;}}}
   _nxCursor();
 }
 function _nxCursor(){
@@ -135,8 +148,4 @@ function nwsGraphTab(k,keep){
   var cur=document.getElementById('nx-cur');if(cur)cur.style.setProperty('--c',s.c);
   _nxCursor();
 }
-function nwsSection(k){_nxSec=k;try{localStorage.setItem('gs_nx_sec',k)}catch(e){}
-  document.querySelectorAll('.nx-seg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-s')===k);});
-  document.querySelectorAll('.nx-sec').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-s')===k);});
-  if(k==='graphs')nwsGraphTab(_nxGraph,true);if(k==='hourly')nwsSetHour(_nxHr);}
 document.addEventListener('keydown',function(e){if(!_nx||!document.getElementById('view-nws').classList.contains('active'))return;var t=e.target.tagName;if(t==='INPUT'&&e.target.type!=='range'||t==='SELECT')return;if(e.target.id==='nx-sl')return;if(e.key==='ArrowRight'){nwsSetHour(_nxHr+1);e.preventDefault();}else if(e.key==='ArrowLeft'){nwsSetHour(_nxHr-1);e.preventDefault();}});

@@ -156,13 +156,14 @@ var PAGES={
   bandRows(['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16']);}},
  nws:{t:'NWS GROUND',h:function(){return ''+
   '<h3>WHAT IT IS FOR</h3>'+
-  '<p>This tab shows the official forecast for the spot you search, written by the forecasters at your local NWS Weather Forecast Office. The app looks the location up on api.weather.gov, which returns that office\'s forecast grid: twelve-hour periods for seven days (the 7-DAY cards), hourly periods (the 48-HOUR OUTLOOK) and the raw forecast values behind the graphs.'+r(29)+' Active alerts for the point come from the same service.</p>'+
+  '<p>This tab shows the official forecast for the spot you search, written by the forecasters at your local NWS Weather Forecast Office. The app looks the location up on api.weather.gov, which returns that office\'s forecast grid: twelve-hour periods for seven days (the 7-DAY cards and the NWS TEXT FORECAST under them), hourly periods (the HOUR slider) and the raw forecast values behind the graph.'+r(29)+' Active alerts and special weather statements for the point come from the same service.</p>'+
   '<h3>HOW TO USE IT</h3>'+
   '<ol><li>Type a ZIP code, city or state, pick a match, and press <b>ACQUIRE FORECAST</b>. U.S. locations only (data from api.weather.gov).</li>'+
   '<li>Use <b>IMPERIAL / METRIC</b> to switch units. <b>AUTO-REFRESH</b> keeps the data current; <b>CLEAR STATION</b> resets.</li>'+
-  '<li><b>Tap</b> the current-conditions box, any hourly or 7-day card, or an alert to expand the full text.</li>'+
+  '<li>Drag the <b>HOUR</b> slider (or press the arrow keys) to step through the next 48 hours. The wind dial, the readouts and the marker on the graph all follow it.</li>'+
+  '<li>Click a graph tab (<b>TEMP</b>, <b>DEW PT</b>, <b>HUMIDITY</b>, <b>SKY</b>, <b>PRECIP</b>, <b>WIND</b>, <b>PRESSURE</b>) to change the graph. Click a <b>7-DAY</b> card to read that day\'s NWS text forecast, and click an alert to expand its full text.</li>'+
   '<li>The location you pick also centers the <b>RADAR</b> tab and can be pinned on the 3D globe.</li>'+
-  '<li>The links under the forecast open NWS pages for the same point: <b>FORECAST ↗</b> (the weather.gov point forecast), <b>NWS CHART ↗</b> (the hourly weather graph), <b>RADAR ↗</b> (radar.weather.gov) and <b>NHC ↗</b> (the National Hurricane Center, for tropical storms and hurricanes).'+r(32)+'</li></ol>'+
+  '<li>The links under the forecast open NWS pages for the same point: <b>FORECAST ↗</b> (the weather.gov point forecast), <b>GRAPHICAL ↗</b> (the hourly weather graph), <b>RADAR ↗</b> (radar.weather.gov) and <b>NHC ↗</b> (the National Hurricane Center, for tropical storms and hurricanes).'+r(32)+'</li></ol>'+
   '<h3>WATCH, WARNING OR ADVISORY?</h3>'+
   '<table class="g-tbl"><tr><th>TERM</th><th>NWS DEFINITION</th><th>WHAT TO DO</th></tr>'+
   '<tr><td><b>Outlook</b></td><td>A hazardous event may develop in the next 7 days</td><td>Stay aware; check back</td></tr>'+
@@ -191,16 +192,16 @@ var PAGES={
   '<tr><td>40+ mph</td><td>Strong, dangerous, high or damaging</td></tr></table>'+
   '<p><b>Temperatures:</b> "near 50" means 48-52, "lower 50s" 50-54, "mid 50s" 53-57, "upper 50s" 56-59. <b>Periods:</b> Today is 6 a.m.-6 p.m., Tonight 6 p.m.-6 a.m., This Evening 6 p.m.-midnight, Overnight midnight-6 a.m.'+r(27)+'</p>'+
   '<h3>READ IN THIS ORDER</h3>'+
-  '<ol><li><b>Alerts</b> (orange box): watches, warnings and advisories issued by your local NWS office. Expand and read the full text.</li>'+
-  '<li><b>Current conditions</b>, then the <b>48-hour outlook</b> for timing, then the <b>7-day forecast</b> for the trend.</li>'+
-  '<li>The <b>48-hour graphs</b> to see how the ingredients change together.</li></ol>'+
+  '<ol><li><b>Alerts &amp; special weather statements</b> (under current conditions; the NWS GROUND tab shows a count when any are active): watches, warnings, advisories and statements issued by your local NWS office. Expand and read the full text. The <b>HAZARDOUS WEATHER OUTLOOK ↗</b> link opens the office\'s 7-day hazard summary.</li>'+
+  '<li><b>Current conditions</b> and the NWS text for this period, then the <b>HOUR</b> slider for timing, then the <b>7-day forecast</b> for the trend.</li>'+
+  '<li>The <b>graph tabs</b> to see how each ingredient changes over 48 hours.</li></ol>'+
   '<h3>WHAT TO LOOK FOR IN THE GRAPHS</h3>'+
   '<div class="g-card"><div class="g-card-hd">TEMPERATURE</div><p>The forecast air temperature for each hour. Compare it with the dew point line below: the gap between them (the dew point depression) shows how close the air is to saturation.'+r(28)+'</p></div>'+
   '<div class="g-card"><div class="g-card-hd">PRECIP. (%)</div><p>The hourly chance of measurable precipitation (0.01 in or more) at your point.'+r(27)+' Look for when the curve rises above about 50% to time rain or snow, and for steady high values that mean a long-lasting event rather than brief showers.</p></div>'+
   '<div class="g-card"><div class="g-card-hd">DEW POINT</div><p>The temperature air must cool to before it is saturated (100% humidity); a higher dew point means more moisture.'+r(28)+' It measures how much moisture is actually in the air, so it is a better comfort gauge than relative humidity. In summer: 55°F or lower feels dry and comfortable, 55-65°F gets sticky, 65°F and up is oppressive.'+r(16)+'</p><p>When the temperature and dew point lines come together, humidity approaches 100%; overnight that is when fog and low cloud become likely.</p></div>'+
   '<div class="g-card"><div class="g-card-hd">HUMIDITY</div><p>Relative humidity rises at night and falls in the afternoon even when moisture stays the same, because it depends on temperature. Use dew point to judge real moisture changes.'+r(16)+'</p></div>'+
   '<div class="g-card"><div class="g-card-hd">BAROMETRIC PRESSURE</div><p>Large pressure changes come from passing high and low pressure systems. Falling pressure signals an approaching low and worsening weather; a sudden fall signals strong wind. Pressure also has a small daily cycle (highest near 10 a.m./p.m., lowest near 4 a.m./p.m.), so ignore small wiggles and look at the multi-hour trend. Standard sea-level pressure is 1013.25 hPa (29.92 inHg).'+r(15)+'</p></div>'+
-  '<div class="g-card"><div class="g-card-hd">WIND DIRECTION / SPEED</div><p>Direction is where the wind blows <i>from</i>, and speed is the sustained (average) wind.'+r(27)+' Gusts are short bursts on top of it; NWS reports a gust when peaks and lulls differ by 10 knots or more.'+r(28)+' A sharp wind shift accompanied by a drop in dew point and temperature marks a front or outflow passing through.</p></div>'+
+  '<div class="g-card"><div class="g-card-hd">WIND DIAL / WIND</div><p>The dial\'s arrow points in from the direction the wind blows <i>from</i>, with the speed in the middle, and speed is the sustained (average) wind.'+r(27)+' Gusts are short bursts on top of it; NWS reports a gust when peaks and lulls differ by 10 knots or more.'+r(28)+' A sharp wind shift accompanied by a drop in dew point and temperature marks a front or outflow passing through.</p></div>'+
   '<div class="g-card"><div class="g-card-hd">SKY COVER &amp; TEMPERATURE</div><p>Clear, calm nights cool fastest; cloud cover holds heat in. Compare sky cover with the temperature curve to see why a night is forecast mild or cold.</p></div>';}},
  radar:{t:'GLOBE RADAR',h:function(){return ''+
   '<h3>WHAT IT IS FOR</h3>'+
