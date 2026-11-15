@@ -1,15 +1,20 @@
-const CACHE = 'goes-star-v13';
+const CACHE = 'goes-star-v14';
 const ASSETS = [
   './index.html',
   './guide.js',
   './legend.js',
+  './nws.js',
+  './ui.css',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
   './globe.js',
   './vendor/satellite.min.js',
   './vendor/fonts/jetbrains-mono-400.woff2',
-  './vendor/fonts/jetbrains-mono-700.woff2'
+  './vendor/fonts/jetbrains-mono-700.woff2',
+  './vendor/fonts/inter-400.woff2',
+  './vendor/fonts/inter-600.woff2',
+  './vendor/fonts/inter-700.woff2'
 ];
 
 self.addEventListener('install', e => {

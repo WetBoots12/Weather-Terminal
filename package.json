@@ -20,6 +20,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.0.0",
+    "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.0.0",
     "@tauri-apps/cli": "^2.12.4",
     "cesium": "1.145.0",
