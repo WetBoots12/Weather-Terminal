@@ -122,11 +122,14 @@ var css=''+
 '@media(max-width:768px){#img-legend{left:8px;right:8px;width:auto;max-width:none;bottom:30px}#img-legend .lg-hd{min-height:34px;font-size:10px}#img-legend .lg-body{max-height:40vh}.lg-ticks span{font-size:9px}.lg-k{font-size:10px}}';
 
 var box,cur='',LSKEY='gs_legend_open';
+var cssDone=false;function injCss(){if(cssDone)return;cssDone=true;var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);}
+/* used by the 3D globe's color key: the scale for a GOES band, or null */
+window.goesKeyHTML=function(b){var h=legendHTML(b),info=(window.GUIDE_BANDS||{})[b];if(!h)return null;injCss();return{t:(info?info[0]:b).replace(/<[^>]+>/g,''),h:h};};
 function isOpen(){try{var v=localStorage.getItem(LSKEY);if(v!==null)return v==='1';}catch(e){}return !window.matchMedia||!window.matchMedia('(max-width:768px)').matches;}
 function ensure(){
   if(box)return box;
   var v=document.getElementById('view-loops');if(!v)return null;
-  var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+  injCss();
   box=document.createElement('div');box.id='img-legend';box.setAttribute('aria-live','polite');
   box.innerHTML='<button class="lg-hd" type="button" aria-expanded="true"><span class="lg-t"></span><span class="lg-arrow"></span></button><div class="lg-body"></div>';
   box.querySelector('.lg-hd').onclick=function(){setOpen(box.classList.contains('collapsed'));};
