@@ -10,7 +10,10 @@
     "ios:assets": "npx capacitor-assets generate --ios",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
-    "desktop:icons": "tauri icon app/icon-512.png"
+    "desktop:icons": "tauri icon app/icon-512.png",
+    "desktop:lite:dev": "tauri dev --config src-tauri/tauri.lite.conf.json",
+    "desktop:lite:build": "tauri build --config src-tauri/tauri.lite.conf.json",
+    "desktop:lite:icons": "tauri icon assets/icon-lite.png -o src-tauri/icons-lite"
   },
   "dependencies": {
     "@capacitor/core": "^8.0.0",

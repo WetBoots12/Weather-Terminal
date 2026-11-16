@@ -5,7 +5,7 @@ var globeReady=false,_diskOverlayActive=false,_globeKick=function(){globeResize(
 var _G={goesSeq:0,radarSeq:0,v:null,layers:{},radar:[],radarIdx:0,radarTimer:null,goes:[],goesUrls:[],disk:[],diskIdx:-1,ents:{},pending:null,pin:null,cone:[],lut:{},refresh:null};
 var _GEO_ALT=0.75*6371000,_LEO_ALT=0.2*6371000; /* stylized altitudes so orbits fit on screen, as before */
 /* mode = which weather overlay is on: 'radar' | 'goes' | 'off' (the RADAR / GOES switch) */
-var _gOpts={labels:true,terrain:true,grid:true,sats:true,light:false,mode:'radar',radar:'libre',loop:false,goes:'GEOCOLOR',goesSat:'both',opacity:75};
+var _gOpts={labels:true,terrain:!window.GS_LITE,grid:true,sats:true,light:false,mode:'radar',radar:'libre',loop:false,goes:'GEOCOLOR',goesSat:'both',opacity:75};
 try{var _gs=JSON.parse(localStorage.getItem('gs_globe')||'null');if(_gs){if(!_gs.mode)_gs.mode=(_gs.goes&&_gs.goes!=='off')?'goes':(_gs.radar==='off'?'off':'radar');
   if(_gs.radar==='off')delete _gs.radar;if(_gs.radar==='rv')_gs.radar='global';if(_gs.radar==='iem')_gs.radar='bref_qcd';if(_gs.goes==='off')delete _gs.goes;for(var _k in _gs)if(_k in _gOpts)_gOpts[_k]=_gs[_k];}}catch(e){}
 function _gSave(){try{localStorage.setItem('gs_globe',JSON.stringify(_gOpts));}catch(e){}}
@@ -27,7 +27,10 @@ function _gLoadEngine(){
   });
   return _gLoad;
 }
-window.addEventListener('load',function(){setTimeout(function(){(window.requestIdleCallback||setTimeout)(function(){_gLoadEngine().catch(function(){});});},2500);});
+if(!window.GS_LITE)window.addEventListener('load',function(){setTimeout(function(){(window.requestIdleCallback||setTimeout)(function(){_gLoadEngine().catch(function(){});});},2500);});
+/* Lite: parsing Cesium freezes an older CPU for over a second, so wait until the pointer or keyboard reaches the 3D tab */
+else document.addEventListener('DOMContentLoaded',function(){var b=document.querySelector('.tab-btn[onclick*="\'3d\'"]');if(!b)return;
+  var go=function(){_gLoadEngine().catch(function(){});};b.addEventListener('pointerenter',go,{once:true});b.addEventListener('focus',go,{once:true});});
 function initGlobe(){
   if(globeReady)return;globeReady=true;_gSyncUI();
   if(!window.Cesium)_gStatus('LOADING 3D ENGINE…');
@@ -52,11 +55,17 @@ function _gBuild(){
   sc.postProcessStages.fxaa.enabled=true;if(IS_TOUCH&&window.devicePixelRatio>2)v.resolutionScale=2/window.devicePixelRatio*1;
   gl.showGroundAtmosphere=true;gl.baseColor=C.Color.fromCssColorString('#0d2d4a');
   sc.backgroundColor=C.Color.BLACK;sc.fog.enabled=true;
+  /* Lite: render 75% of the pixels, skip the FXAA pass and the ground-atmosphere and fog shading
+     (fog still culls far tiles), and load coarser tiles. About 2x the frame rate when moving the globe. */
+  if(window.GS_LITE){v.resolutionScale=.75;sc.postProcessStages.fxaa.enabled=false;gl.showGroundAtmosphere=false;sc.fog.renderable=false;
+    gl.maximumScreenSpaceError=3;gl.tileCacheSize=150;gl.loadingDescendantLimit=6;}
   var ctl=sc.screenSpaceCameraController;ctl.minimumZoomDistance=120;ctl.maximumZoomDistance=8e7;
   v.clock.clockStep=C.ClockStep.SYSTEM_CLOCK;v.clock.shouldAnimate=true;
   /* labels + roads (Google Earth style hybrid) */
   _G.layers.places=v.imageryLayers.addImageryProvider(_gEsri('Reference/World_Boundaries_and_Places',18,'Labels: Esri'));
-  _G.layers.roads=v.imageryLayers.addImageryProvider(_gEsri('Reference/World_Transportation',18,'Roads: Esri'));
+  /* Lite: roads load only once zoomed in to city scale */
+  if(window.GS_LITE)v.imageryLayers.add(_G.layers.roads=new C.ImageryLayer(_gEsri('Reference/World_Transportation',18,'Roads: Esri'),{minimumTerrainLevel:7}));
+  else _G.layers.roads=v.imageryLayers.addImageryProvider(_gEsri('Reference/World_Transportation',18,'Roads: Esri'));
   /* terrain */
   C.ArcGISTiledElevationTerrainProvider.fromUrl('https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer')
     .then(function(tp){_G.terrain=tp;_gApplyTerrain();})
@@ -97,7 +106,7 @@ function _gBuild(){
     if(_gOpts.mode==='radar'&&Date.now()-(_G.radarAt||0)>300000)_gRadar(true);
     if(_gOpts.mode==='goes'&&Date.now()-(_G.goesAt||0)>600000)_gGoes();
   },30000);
-  setInterval(function(){if(!_gVisible()||document.hidden)return;_gUpdateLEO();_gSunInfo();_gRender();},1000);
+  setInterval(function(){if(!_gVisible()||document.hidden)return;_gUpdateLEO();_gSunInfo();_gRender();},window.GS_LITE?2000:1000);
   setInterval(function(){if(_diskOverlayActive&&_gVisible())_gDiskTick();},120);
   _gUpdateLEO();_gSunInfo();_gStatus('');
 }
@@ -312,7 +321,7 @@ function _gWhenLoaded(ms,cb){var g=_G.v.scene.globe,done=0,rm,to;
   to=setTimeout(fin,ms);_G.radarWait=function(){done=1;if(rm)rm();clearTimeout(to);};_gRender();}
 /* crossfade from the current frame to frame j */
 function _gFadeTo(j){var from=_G.radar[_G.radarIdx],to=_G.radar[j],ra=Math.min(1,_gOpts.opacity/100+.15),t0=performance.now(),D=280;
-  _G.radarIdx=j;_gFrameInfo();if(!from||!to||from===to){_gApplyOpacity();_gRender();return;}
+  _G.radarIdx=j;_gFrameInfo();if(!from||!to||from===to||window.GS_LITE){_gApplyOpacity();_gRender();return;}/* Lite: cut, not a 280 ms fade (one redraw per frame instead of ~17) */
   if(_G.radarFade)cancelAnimationFrame(_G.radarFade);
   (function step(){var k=Math.min(1,(performance.now()-t0)/D);from.alpha=ra*(1-k);to.alpha=ra*k;_gRender();
     _G.radarFade=k<1?requestAnimationFrame(step):0;if(k>=1)_gApplyOpacity();})();}
@@ -325,7 +334,8 @@ function _gRadar(soft){
   _radarProduct=key;
   _gRadarUI();
   if(_gOpts.mode!=='radar'){_gRadarInfo('');_gTs('');_gRender();return;}
-  var play=!!P.loop,stTag=_radarScope==='national'?'NATIONAL':(_radarStation||'LOCAL');
+  /* Lite loops are shorter: fewer frame layers to download, keep in memory and draw */
+  var LT=!!window.GS_LITE,play=!!P.loop,stTag=_radarScope==='national'?'NATIONAL':(_radarStation||'LOCAL');
   /* sources: list of alternatives; each is a function returning frames [{t,label,p}] or a promise of them */
   function show(frames,src,fallback){
     if(seq!==_G.radarSeq)return;
@@ -344,7 +354,7 @@ function _gRadar(soft){
       if(lp.errorEvent)lp.errorEvent.addEventListener(function(){if(ok||seq!==_G.radarSeq)return;if(++bad===6){_gClearRadar();fallback();}});
       setTimeout(function(){ok=1;},9000);}
     if(frames.length>1){
-      var startLoop=function(){var dwell=0;_G.radarTimer=setInterval(function(){if(!_gVisible()||!_gOpts.loop||_G.radarSeq!==seq)return;if(_G.radarIdx===last&&dwell++<3)return;dwell=0;_gFadeTo((_G.radarIdx+1)%frames.length);},600);};
+      var startLoop=function(){var dwell=0;_G.radarTimer=setInterval(function(){if(!_gVisible()||!_gOpts.loop||_G.radarSeq!==seq)return;if(_G.radarIdx===last&&dwell++<3)return;dwell=0;_gFadeTo((_G.radarIdx+1)%frames.length);},window.GS_LITE?900:600);};
       var pend=_G.radar.filter(function(l){return l._pre;});
       if(!pend.length)startLoop();
       else _gWhenLoaded(3000,function(){if(seq!==_G.radarSeq)return;pend.forEach(function(l){l._pre=false;});_gApplyOpacity();
@@ -353,10 +363,10 @@ function _gRadar(soft){
     }
     _gRender();
   }
-  function iemLoop(){var fr=[];for(var m=play?50:0;m>=0;m-=5)fr.push({t:Date.now()-m*60000,p:_gTile(IEM_TILE+'nexrad-n0q-900913'+(m?'-m'+(m<10?'0':'')+m+'m':'')+'/{z}/{x}/{y}.png',10,_gConus(),'Radar: NOAA NEXRAD via Iowa Environmental Mesonet')});return fr;}
+  function iemLoop(){var fr=[];for(var m=play?(LT?40:50):0;m>=0;m-=LT?10:5)fr.push({t:Date.now()-m*60000,p:_gTile(IEM_TILE+'nexrad-n0q-900913'+(m?'-m'+(m<10?'0':'')+m+'m':'')+'/{z}/{x}/{y}.png',10,_gConus(),'Radar: NOAA NEXRAD via Iowa Environmental Mesonet')});return fr;}
   function rvJson(url,name,credit,max,fb){
     fetch(url).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){
-      var past=((d.radar&&d.radar.past)||[]).slice(play?-6:-1);if(!past.length)throw 0;
+      var past=((d.radar&&d.radar.past)||[]).slice(play?(LT?-4:-6):-1);if(!past.length)throw 0;
       var host=d.host||(url.indexOf('rainviewer')>0?'https://tilecache.rainviewer.com':url.replace(/\/public\/weather-maps\.json$/,''));
       show(past.map(function(f){return{t:f.time*1000,k:host+f.path,p:new C.UrlTemplateImageryProvider({url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maximumLevel:max,credit:credit})};}),name,fb);
     }).catch(function(){if(seq!==_G.radarSeq||soft)return;if(fb)fb();else _gFail(name+' UNREACHABLE');});
@@ -374,12 +384,12 @@ function _gRadar(soft){
     case 'global':rainviewer();break;
     case 'bref_qcd':show(iemLoop(),'IEM NEXRAD',rainviewer);break;
     case 'eccc':(function(){var fr=[],base=Math.floor((Date.now()-6*60000)/360000)*360000;
-      for(var k=play?8:0;k>=0;k--){var tt=base-k*360000;fr.push({t:tt,p:_gWms('https://geo.weather.gc.ca/geomet','RADAR_1KM_RRAI',C.Rectangle.fromDegrees(-170,15,-45,85),'Radar: Environment and Climate Change Canada (MSC GeoMet)',Object.assign({styles:'Radar-Rain_14colors'},play?{time:new Date(tt).toISOString().slice(0,19)+'Z'}:null))});}
+      for(var k=play?(LT?4:8):0;k>=0;k--){var tt=base-k*360000;fr.push({t:tt,p:_gWms('https://geo.weather.gc.ca/geomet','RADAR_1KM_RRAI',C.Rectangle.fromDegrees(-170,15,-45,85),'Radar: Environment and Climate Change Canada (MSC GeoMet)',Object.assign({styles:'Radar-Rain_14colors'},play?{time:new Date(tt).toISOString().slice(0,19)+'Z'}:null))});}
       show(fr,'ECCC GEOMET');})();break;
     case 'hrrr':
       fetch('https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_0060.json').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){var t=Date.parse(j.model_init_utc);return isNaN(t)?null:t;}).catch(function(){return null;}).then(function(init){
         var now=Date.now(),fr=[];
-        for(var m=60;m<=1080&&fr.length<(play?12:1);m+=60){var vt=init?init+m*60000:null;if(vt&&vt<now-30*60000)continue;
+        for(var m=60;m<=1080&&fr.length<(play?(LT?6:12):1);m+=60){var vt=init?init+m*60000:null;if(vt&&vt<now-30*60000)continue;
           fr.push({t:vt||now,label:'+'+(m/60)+'H'+(vt?' — VALID '+new Date(vt).toISOString().slice(11,16)+' UTC':''),p:_gTile(IEM_TILE+'hrrr::REFD-F'+('000'+m).slice(-4)+'-0/{z}/{x}/{y}.png',10,_gConus(),'Forecast: NOAA HRRR via IEM')});}
         show(fr,'HRRR FORECAST'+(init?' (RUN '+new Date(init).toISOString().slice(11,13)+'Z)':''));
       });break;
@@ -549,7 +559,7 @@ function _gClearGoes(){_G.goes.forEach(function(l){_G.v.imageryLayers.remove(l,t
 function _gGoes(){
   if(!_G.v)return;var seq=_G.goesSeq=(_G.goesSeq||0)+1;_G.goesAt=Date.now();
   if(_gOpts.mode!=='goes'){_G.goesSeq++;_gClearGoes();_gGoesInfo('');_gRender();return;}
-  var band=_gOpts.goes,size=IS_TOUCH?'1808x1808':'5424x5424',sats=_gOpts.goesSat==='both'?['GOES18','GOES19']:[_gOpts.goesSat],bust=Math.floor(Date.now()/600000);
+  var band=_gOpts.goes,size=(IS_TOUCH||window.GS_LITE)?'1808x1808':'5424x5424',/* Lite: 1808 px source, 1/5 the download and ~1/3 the texture memory */sats=_gOpts.goesSat==='both'?['GOES18','GOES19']:[_gOpts.goesSat],bust=Math.floor(Date.now()/600000);
   _gGoesInfo('LOADING GOES '+band+'…');
   Promise.all(sats.map(function(s){
     return _gLoadImg('https://cdn.star.nesdis.noaa.gov/'+s+'/ABI/FD/'+band+'/'+size+'.jpg?_='+bust).then(function(im){
