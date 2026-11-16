@@ -4,3 +4,4 @@ ios/App/build/
 ios/DerivedData/
 *.ipa
 .DS_Store
+dist-lite/

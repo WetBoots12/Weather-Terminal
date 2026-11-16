@@ -42,6 +42,31 @@ Links such as *View in STAR viewer* and the NWS pages open in your default brows
 
 Later launches open normally. Links such as *View in STAR viewer* open in your default browser.
 
+## GOES-STAR Lite (for older Macs)
+
+A separate, lighter app for older computers such as Intel Macs. It installs next to GOES-STAR (its own name,
+icon with a LITE badge, bundle id `com.wetboots12.goesstar.lite` and saved settings) and has every feature, at a
+lower cost:
+
+| Area | GOES-STAR | GOES-STAR Lite |
+|---|---|---|
+| 3D globe rendering | full resolution, FXAA, ground atmosphere and fog shading | 75% resolution, no FXAA, no atmosphere/fog shading, coarser tiles, smaller tile cache |
+| 3D terrain | on by default | off by default (switch it on in the globe options) |
+| Road overlay | all zoom levels | only when zoomed in to city scale |
+| GOES overlay on the globe | 5424 px full disk (~10 MB per satellite) | 1808 px full disk (~1.8 MB per satellite) |
+| Radar loop on the globe | 6-12 frames, 280 ms crossfade, 0.6 s per frame | 4-6 frames, hard cut, 0.9 s per frame |
+| Live Imagery loop | 16 frames, 0.25 s per frame | 10 frames, 0.4 s per frame (16-30 still selectable) |
+| 3D engine (6 MB) | preloaded 2.5 s after launch | loaded when the pointer reaches the 3D ORBITAL tab |
+| Satellite positions | updated every 1 s | every 2 s |
+| Scanline animation | on | off |
+
+Install: Actions tab → latest *macOS Lite build* run → download **GOES-STAR-Lite-macOS-dmg**, unzip, open
+`GOES-STAR-Lite-macOS-universal.dmg` and drag **GOES-STAR Lite** to Applications. First launch is blocked once,
+as described under *Install on Mac* (Terminal: `xattr -dr com.apple.quarantine "/Applications/GOES-STAR Lite.app"`).
+
+The web version runs in Lite mode with `?lite=1`. Build it locally with `npm run desktop:lite:build`;
+`scripts/build-lite.mjs` copies `app/` to `dist-lite/` with the Lite flag set.
+
 ## Run the web version
 
 ```
