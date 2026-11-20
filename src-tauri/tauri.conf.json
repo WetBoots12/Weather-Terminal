@@ -23,7 +23,8 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' blob: 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://api.weather.gov https://nominatim.openstreetmap.org https://celestrak.org https://cdn.star.nesdis.noaa.gov https://mesonet.agron.iastate.edu https://opengeo.ncep.noaa.gov https://geo.weather.gc.ca https://server.arcgisonline.com https://elevation3d.arcgis.com https://*.rainviewer.com https://*.librewxr.net; connect-src 'self' data: blob: ipc: http://ipc.localhost https://api.weather.gov https://nominatim.openstreetmap.org https://celestrak.org https://cdn.star.nesdis.noaa.gov https://mesonet.agron.iastate.edu https://opengeo.ncep.noaa.gov https://geo.weather.gc.ca https://server.arcgisonline.com https://elevation3d.arcgis.com https://*.rainviewer.com https://*.librewxr.net; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "dangerousDisableAssetCspModification": true
     }
   },
   "bundle": {

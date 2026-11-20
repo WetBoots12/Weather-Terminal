@@ -367,7 +367,8 @@ function _gRadar(soft){
   function rvJson(url,name,credit,max,fb){
     fetch(url).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){
       var past=((d.radar&&d.radar.past)||[]).slice(play?(LT?-4:-6):-1);if(!past.length)throw 0;
-      var host=d.host||(url.indexOf('rainviewer')>0?'https://tilecache.rainviewer.com':url.replace(/\/public\/weather-maps\.json$/,''));
+      var def=url.indexOf('rainviewer')>0?'https://tilecache.rainviewer.com':url.replace(/\/public\/weather-maps\.json$/,''),host=/^https:\/\/([a-z0-9-]+\.)*(rainviewer\.com|librewxr\.net)$/i.test(d.host||'')?d.host:def;
+      past=past.filter(function(f){return /^\/[\w\/.-]*$/.test(f&&f.path||'');});if(!past.length)throw 0;
       show(past.map(function(f){return{t:f.time*1000,k:host+f.path,p:new C.UrlTemplateImageryProvider({url:host+f.path+'/256/{z}/{x}/{y}/2/1_1.png',maximumLevel:max,credit:credit})};}),name,fb);
     }).catch(function(){if(seq!==_G.radarSeq||soft)return;if(fb)fb();else _gFail(name+' UNREACHABLE');});
   }

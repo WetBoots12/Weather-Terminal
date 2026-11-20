@@ -25,7 +25,9 @@ fn is_app_url(url: &tauri::Url) -> bool {
             url.host_str(),
             Some("tauri.localhost") | Some("localhost") | Some("127.0.0.1")
         ),
-        _ => true, // tauri://, asset:, about:, data:, blob:
+        "tauri" | "asset" | "blob" => true, // bundled app content
+        "about" => matches!(url.as_str(), "about:blank" | "about:srcdoc"),
+        _ => false, // file:, data:, javascript:, mailto:, etc. are never loaded in-app
     }
 }
 
@@ -36,7 +38,11 @@ fn external_links<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
             if is_app_url(url) {
                 return true;
             }
-            let _ = webview.opener().open_url(url.as_str(), None::<&str>);
+            if matches!(url.scheme(), "http" | "https") {
+                // External web links open in the system browser.
+                let _ = webview.opener().open_url(url.as_str(), None::<&str>);
+            }
+            // Everything else is denied without being opened.
             false
         })
         .build()

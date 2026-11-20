@@ -6,23 +6,26 @@ on:
     paths: ['app/**', 'src-tauri/**', 'package*.json', 'scripts/**', 'assets/icon-lite.png', '.github/workflows/macos-lite-build.yml']
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri -> target
 
@@ -51,8 +54,13 @@ jobs:
           mkdir -p out && cp "$DMG" out/GOES-STAR-Lite-macOS-universal.dmg
           ls -lh out
 
-      - uses: actions/upload-artifact@v4
+      - name: Checksums
+        run: cd out && shasum -a 256 *.dmg > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: GOES-STAR-Lite-macOS-dmg
-          path: out/GOES-STAR-Lite-macOS-universal.dmg
+          path: |
+            out/GOES-STAR-Lite-macOS-universal.dmg
+            out/SHA256SUMS.txt
           retention-days: 30
